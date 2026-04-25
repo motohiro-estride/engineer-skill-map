@@ -28,9 +28,22 @@ venv/
 
 # ビルド成果物
 dist/
+dist-local/
 build/
 .next/
 out/
+
+# Astro
+.astro/
+
+# Yarn 4 (nodeLinker: node-modules モード)
+.yarn/*
+!.yarn/patches
+!.yarn/plugins
+!.yarn/releases
+!.yarn/sdks
+!.yarn/versions
+.pnp.*
 
 # IDE（共有設定はリポジトリに残す方針なら .vscode は除外しない）
 .idea/
