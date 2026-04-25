@@ -61,6 +61,11 @@
 - 公開Web は `gh-pages` ブランチへローカルから手動 push (CI 不使用)
 - ビルド時に漏洩チェックスクリプトを必ず実行
 
+### 実装に関する設計仕様
+
+- スキーマ実装仕様: [.claude/design/schema-design.md](design/schema-design.md) — YAML 構造、enum 値、命名、参照方式、拡張余地
+- コード責任分解: [.claude/design/code-architecture.md](design/code-architecture.md) — モジュール別の役割・入出力・副作用境界
+
 ### v1 のスコープ (Yes/No)
 
 - ✓ スキルシートの公開Web表示 (default 1本)
