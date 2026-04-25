@@ -1,0 +1,60 @@
+---
+import { collectTerminalData } from "./data-source";
+import "./styles.css";
+
+const data = await collectTerminalData();
+const dataJson = JSON.stringify(data);
+
+// 自動再生で流すコマンド列
+const autoplay = [
+  "whoami",
+  "cat profile.md",
+  "tree projects/",
+  "ls tech-tags/",
+  "stats",
+  "help",
+];
+const autoplayJson = JSON.stringify(autoplay);
+---
+
+<div class="term-root" id="term-root" role="region" aria-label="terminal">
+  <div class="term-scroll" id="term-scroll">
+    <div class="term-output" id="term-output"></div>
+  </div>
+  <div class="term-prompt-line" id="term-prompt-line">
+    <span class="term-prompt-symbol">❯</span>
+    <span class="term-input-display" id="term-input-display"></span>
+    <span class="term-cursor" id="term-cursor" aria-hidden="true"></span>
+  </div>
+</div>
+
+<script define:vars={{ dataJson, autoplayJson }}>
+  // 起動時にだけ window に置く(他のモジュールから参照しない)
+  window.__TERMINAL_DATA__ = JSON.parse(dataJson);
+  window.__TERMINAL_AUTOPLAY__ = JSON.parse(autoplayJson);
+</script>
+
+<script>
+  import { TerminalRunner } from "./runner";
+
+  const data = (window as any).__TERMINAL_DATA__;
+  const autoplay = (window as any).__TERMINAL_AUTOPLAY__;
+
+  const elements = {
+    output: document.getElementById("term-output")!,
+    promptLine: document.getElementById("term-prompt-line")!,
+    prompt: document.getElementById("term-prompt-line")!.querySelector(".term-prompt-symbol") as HTMLElement,
+    inputDisplay: document.getElementById("term-input-display")!,
+    cursor: document.getElementById("term-cursor")!,
+    rootScroll: document.getElementById("term-scroll")!,
+  };
+
+  if (data && elements.output) {
+    const runner = new TerminalRunner({
+      data,
+      elements,
+      autoplay,
+    });
+    runner.start();
+  }
+</script>

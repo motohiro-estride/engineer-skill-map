@@ -1,18 +1,427 @@
 ---
+import { getCollection, getEntry } from "astro:content";
+import { getBuildMode } from "@/config";
+import {
+  expandEngineer,
+  expandProject,
+  isProjectVisible,
+  isProjectInStats,
+  buildLookup,
+  resolveRole,
+  resolveTechTag,
+  calculateAge,
+  calculateExperienceYears,
+  calculatePeriodLabel,
+  calculateTagCumulativeYears,
+  calculateTagProjectCount,
+  phaseLabels,
+  phaseOrder,
+} from "@/domain";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import Terminal from "@/components/Terminal/Terminal.astro";
+import { ModeToggle } from "@/components/ModeToggle/ModeToggle";
 import "../styles/globals.css";
+
+const mode = getBuildMode();
+
+const engineerEntry = await getEntry("engineer", "me");
+const engineer = engineerEntry ? expandEngineer(engineerEntry.data, mode) : null;
+
+const projectEntries = await getCollection("projects");
+const techTagEntries = await getCollection("techTags");
+const industryTagEntries = await getCollection("industryTags");
+const roleEntries = await getCollection("roles");
+
+// 参照解決用 Lookup
+const techTagsLookup = buildLookup(
+  techTagEntries.map((e) => ({ id: e.id, data: e.data })),
+);
+const industryTagsLookup = buildLookup(
+  industryTagEntries.map((e) => ({ id: e.id, data: e.data })),
+);
+const rolesLookup = buildLookup(
+  roleEntries.map((e) => ({ id: e.id, data: e.data })),
+);
+
+// プロジェクトを展開
+const allProjects = projectEntries.map((e) => ({
+  ...expandProject(e.data, mode),
+  slug: e.id,
+}));
+
+const visibleProjects = allProjects
+  .filter((p) => isProjectVisible(p.visibility, mode))
+  .sort((a, b) => (a.period.start < b.period.start ? 1 : -1));
+
+const statsProjects = allProjects.filter((p) => isProjectInStats(p.visibility));
+
+// 集計: 技術タグの累積経験年数 (baseName で集約)
+const projectsWithBaseNames = statsProjects.map((p) => ({
+  techTagBaseNames: p.techTags
+    .map((id) => techTagsLookup.get(id)?.public.baseName)
+    .filter((n): n is string => Boolean(n)),
+  period: p.period,
+}));
+
+const baseNameMap = new Map<
+  string,
+  { baseName: string; category: string; cumulativeYears: number; projectCount: number }
+>();
+for (const tag of techTagsLookup.values()) {
+  const baseName = tag.public.baseName;
+  if (baseNameMap.has(baseName)) continue;
+  baseNameMap.set(baseName, {
+    baseName,
+    category: tag.public.category,
+    cumulativeYears: calculateTagCumulativeYears(baseName, projectsWithBaseNames),
+    projectCount: calculateTagProjectCount(baseName, projectsWithBaseNames),
+  });
+}
+const uniqueTechTagStats = Array.from(baseNameMap.values())
+  .filter((t) => t.cumulativeYears > 0 || t.projectCount > 0)
+  .sort((a, b) => b.cumulativeYears - a.cumulativeYears);
+
+const experienceYears =
+  statsProjects.length > 0
+    ? calculateExperienceYears(statsProjects.map((p) => p.period))
+    : 0;
+
+const phaseCounts = phaseOrder.map((key) => ({
+  key,
+  label: phaseLabels[key],
+  count: statsProjects.filter((p) => p.phases[key]).length,
+}));
+
+const roleCounts = Array.from(rolesLookup.entries())
+  .map(([id, role]) => ({
+    id,
+    name: role.public.name,
+    rank: role.public.rank,
+    count: statsProjects.filter((p) => p.role === id).length,
+  }))
+  .sort((a, b) => a.rank - b.rank);
+
+const maxTechYears = uniqueTechTagStats[0]?.cumulativeYears ?? 1;
+const age =
+  engineer && "birthDate" in engineer ? calculateAge(engineer.birthDate) : null;
 ---
 
 <!doctype html>
-<html lang="ja">
+<html lang="ja" class="h-full dark">
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width" />
     <title>Engineer Skill Map</title>
+    <script is:inline>
+      // モード初期判定 (CSS が効くより先に data-mode を決め、FOUC を防ぐ)
+      (function () {
+        try {
+          var params = new URLSearchParams(window.location.search);
+          var mode = "world";
+          if (params.get("plain") === "1") {
+            mode = "plain";
+          } else if (
+            window.matchMedia &&
+            window.matchMedia("(prefers-reduced-motion: reduce)").matches
+          ) {
+            mode = "plain";
+          } else {
+            var stored = localStorage.getItem("skillmap.mode");
+            if (stored === "plain") mode = "plain";
+          }
+          document.documentElement.dataset.mode = mode;
+        } catch (e) {
+          document.documentElement.dataset.mode = "world";
+        }
+      })();
+    </script>
+    <style is:global>
+      /* World モード時は HTML スキルシート (main) を隠す */
+      html[data-mode="world"] main {
+        display: none !important;
+      }
+      /* Plain モード時はターミナルを隠す (styles.css にも同等定義あり、二重化で確実に) */
+      html[data-mode="plain"] .term-root {
+        display: none !important;
+      }
+    </style>
   </head>
-  <body class="bg-white text-slate-900">
-    <main class="mx-auto max-w-3xl p-8">
-      <h1 class="text-3xl font-bold">Engineer Skill Map</h1>
-      <p class="mt-4 text-slate-600">v1 セットアップ完了。</p>
+  <body class="text-foreground min-h-full">
+    <Terminal />
+    <ModeToggle client:load />
+
+    <main class="relative mx-auto max-w-4xl space-y-10 p-6 md:p-10">
+      <!-- HERO -->
+      <section class="space-y-6 pt-12 md:pt-20">
+        <div class="flex flex-wrap items-end justify-between gap-4">
+          <div>
+            <p
+              class="text-[10px] tracking-[0.3em] text-blue-200/60 uppercase md:text-xs"
+            >
+              Engineer Skill Map
+            </p>
+            <h1
+              class="mt-2 text-4xl font-bold tracking-tight text-white md:text-6xl"
+            >
+              {
+                engineer && "name" in engineer
+                  ? engineer.name
+                  : "エンジニア スキルシート"
+              }
+            </h1>
+            {
+              engineer && (
+                <p class="mt-3 text-sm text-blue-100/70">
+                  {age && `${age}歳`}
+                  {engineer.gender && ` ・ ${engineer.gender}`}
+                  {engineer.workableArea && ` ・ ${engineer.workableArea}`}
+                </p>
+              )
+            }
+          </div>
+          <Badge
+            variant="outline"
+            className="bg-background/30 border-white/20 font-mono backdrop-blur"
+            >{mode}</Badge
+          >
+        </div>
+
+        <div class="grid grid-cols-2 gap-3 md:grid-cols-4">
+          <div
+            class="rounded-xl border border-white/10 bg-white/5 p-4 backdrop-blur-md"
+          >
+            <p class="text-[10px] tracking-widest text-blue-200/60 uppercase">
+              経験年数
+            </p>
+            <p class="mt-1 text-3xl font-bold tabular-nums text-white">
+              {experienceYears}<span class="ml-0.5 text-base font-normal"
+                >年</span
+              >
+            </p>
+          </div>
+          <div
+            class="rounded-xl border border-white/10 bg-white/5 p-4 backdrop-blur-md"
+          >
+            <p class="text-[10px] tracking-widest text-blue-200/60 uppercase">
+              案件数
+            </p>
+            <p class="mt-1 text-3xl font-bold tabular-nums text-white">
+              {statsProjects.length}<span class="ml-0.5 text-base font-normal"
+                >件</span
+              >
+            </p>
+          </div>
+          <div
+            class="rounded-xl border border-white/10 bg-white/5 p-4 backdrop-blur-md"
+          >
+            <p class="text-[10px] tracking-widest text-blue-200/60 uppercase">
+              主要技術
+            </p>
+            <p class="mt-1 truncate text-2xl font-bold text-white">
+              {uniqueTechTagStats[0]?.baseName ?? "-"}
+            </p>
+          </div>
+          <div
+            class="rounded-xl border border-white/10 bg-white/5 p-4 backdrop-blur-md"
+          >
+            <p class="text-[10px] tracking-widest text-blue-200/60 uppercase">
+              勤務可能地域
+            </p>
+            <p class="mt-1 text-2xl font-bold text-white">
+              {engineer?.workableArea ?? "-"}
+            </p>
+          </div>
+        </div>
+
+        {
+          engineer?.selfPr && (
+            <Card className="bg-card/40 border-white/10 backdrop-blur-md">
+              <CardContent className="pt-6">
+                <p class="text-sm leading-relaxed whitespace-pre-line text-blue-50/90">
+                  {engineer.selfPr}
+                </p>
+              </CardContent>
+            </Card>
+          )
+        }
+      </section>
+
+      <!-- 主要技術 -->
+      <section>
+        <h2 class="mb-4 text-xl font-semibold text-white">主要技術</h2>
+        <Card className="bg-card/40 border-white/10 backdrop-blur-md">
+          <CardContent className="pt-6">
+            {
+              uniqueTechTagStats.length === 0 ? (
+                <p class="text-muted-foreground text-sm">技術タグ未登録</p>
+              ) : (
+                <ul class="space-y-2.5">
+                  {uniqueTechTagStats.slice(0, 12).map((t) => (
+                    <li class="flex items-center gap-3 text-sm">
+                      <Badge
+                        variant="outline"
+                        className="border-white/20 font-mono text-[10px] text-blue-100/80"
+                      >
+                        {t.category}
+                      </Badge>
+                      <span class="w-32 truncate font-medium text-white">
+                        {t.baseName}
+                      </span>
+                      <div class="h-1.5 max-w-[280px] flex-1 overflow-hidden rounded-full bg-white/10">
+                        <div
+                          class="h-full rounded-full bg-gradient-to-r from-blue-400 to-cyan-300"
+                          style={`width: ${Math.min(100, (t.cumulativeYears / maxTechYears) * 100)}%`}
+                        />
+                      </div>
+                      <span class="w-24 text-right text-xs tabular-nums text-blue-100/60">
+                        {t.cumulativeYears}年・{t.projectCount}件
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              )
+            }
+          </CardContent>
+        </Card>
+      </section>
+
+      <!-- フェーズ + 役割 -->
+      <section class="grid gap-4 md:grid-cols-2">
+        <Card className="bg-card/40 border-white/10 backdrop-blur-md">
+          <CardHeader>
+            <CardTitle className="text-base text-white">担当工程</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <ul class="space-y-1.5 text-sm">
+              {
+                phaseCounts.map((p) => (
+                  <li class="flex items-center gap-2">
+                    <span class="flex-1 text-blue-50/80">{p.label}</span>
+                    <Badge
+                      variant={p.count > 0 ? "default" : "outline"}
+                      className={
+                        p.count > 0
+                          ? "bg-blue-500/30 text-blue-50 border-blue-300/30"
+                          : "border-white/15 text-blue-100/40"
+                      }
+                    >
+                      {p.count}件
+                    </Badge>
+                  </li>
+                ))
+              }
+            </ul>
+          </CardContent>
+        </Card>
+        <Card className="bg-card/40 border-white/10 backdrop-blur-md">
+          <CardHeader>
+            <CardTitle className="text-base text-white">役割</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <ul class="space-y-1.5 text-sm">
+              {
+                roleCounts.map((r) => (
+                  <li class="flex items-center gap-2">
+                    <span class="flex-1 text-blue-50/80">{r.name}</span>
+                    <Badge
+                      variant={r.count > 0 ? "default" : "outline"}
+                      className={
+                        r.count > 0
+                          ? "bg-blue-500/30 text-blue-50 border-blue-300/30"
+                          : "border-white/15 text-blue-100/40"
+                      }
+                    >
+                      {r.count}件
+                    </Badge>
+                  </li>
+                ))
+              }
+            </ul>
+          </CardContent>
+        </Card>
+      </section>
+
+      <!-- プロジェクト一覧 -->
+      <section>
+        <h2 class="mb-4 flex items-baseline gap-2 text-xl font-semibold text-white">
+          参画プロジェクト
+          <span class="text-sm font-normal text-blue-100/50"
+            >({visibleProjects.length}件)</span
+          >
+        </h2>
+        <div class="space-y-3">
+          {
+            visibleProjects.map((p) => {
+              const role = resolveRole(p.role, rolesLookup);
+              return (
+                <article class="bg-card/40 space-y-2 rounded-lg border border-white/10 p-4 backdrop-blur-md">
+                  <div class="flex flex-wrap items-baseline gap-2">
+                    <Badge
+                      variant="outline"
+                      className="border-white/20 font-mono text-blue-100/70"
+                    >
+                      No.{p.no}
+                    </Badge>
+                    <h3 class="text-base font-semibold text-white">{p.name}</h3>
+                    <span class="ml-auto text-xs text-blue-100/50 tabular-nums">
+                      {p.period.start} 〜 {p.period.end ?? "現在"} ・{" "}
+                      {calculatePeriodLabel(p.period)}
+                    </span>
+                  </div>
+                  <p class="text-sm leading-relaxed whitespace-pre-line text-blue-50/70">
+                    {p.summary}
+                  </p>
+                  <div class="flex flex-wrap gap-1.5">
+                    {role && (
+                      <Badge className="bg-blue-500/30 text-blue-50 border-blue-300/30">
+                        {role.public.name}
+                      </Badge>
+                    )}
+                    {p.techTags.map((id) => {
+                      const tag = resolveTechTag(id, techTagsLookup);
+                      return tag ? (
+                        <Badge
+                          variant="outline"
+                          className="border-white/15 text-[10px] text-blue-100/80"
+                        >
+                          #{tag.public.name}
+                        </Badge>
+                      ) : null;
+                    })}
+                    {p.industryTags.map((id) => {
+                      const tag = industryTagsLookup.get(id);
+                      return tag ? (
+                        <Badge
+                          variant="outline"
+                          className="border-purple-300/30 bg-purple-400/10 text-[10px] text-purple-100/80"
+                        >
+                          @{tag.public.name}
+                        </Badge>
+                      ) : null;
+                    })}
+                  </div>
+                  {p.memo && (
+                    <div class="mt-2 space-y-0.5 rounded-md border border-amber-300/20 bg-amber-300/10 p-2 text-xs">
+                      <div class="flex items-center gap-1 font-semibold text-amber-100">
+                        📝 メモ
+                        <Badge variant="outline" className="border-amber-300/30 text-[10px] text-amber-100">
+                          selfOnly
+                        </Badge>
+                      </div>
+                      <p class="whitespace-pre-line text-amber-50/80">{p.memo}</p>
+                    </div>
+                  )}
+                </article>
+              );
+            })
+          }
+        </div>
+      </section>
+
+      <footer class="pt-8 text-center text-xs text-blue-100/30">
+        v1 — generated from <code>private/</code> via Astro Content Layer
+      </footer>
     </main>
   </body>
 </html>

@@ -51,7 +51,8 @@
 
 - **データモデル論理設計**: FIX 済 → [.claude/design/data-model.md](design/data-model.md)
 - **技術スタック・アーキテクチャ**: FIX 済 → [.claude/design/tech-stack.md](design/tech-stack.md)
-- **実装**: 未着手 (次のフェーズ)
+- **世界観設計**: FIX 済 → [.claude/design/terminal-design.md](design/terminal-design.md)
+- **実装**: 着手中(リリース期限なし、納得いくまで作り込む)
 - リポジトリ構成は最小限（`README.md`、`.claude/`、`private/`、`docs/`）
 
 ### 主要な技術選択 (詳細は tech-stack.md)
@@ -65,12 +66,22 @@
 
 - スキーマ実装仕様: [.claude/design/schema-design.md](design/schema-design.md) — YAML 構造、enum 値、命名、参照方式、拡張余地
 - コード責任分解: [.claude/design/code-architecture.md](design/code-architecture.md) — モジュール別の役割・入出力・副作用境界
+- 世界観設計: [.claude/design/terminal-design.md](design/terminal-design.md) — ターミナル風 UI / コマンド構成(whoami, cat, tree 等) / O3 ハイブリッド操作モデル / モード切替
 
 ### v1 のスコープ (Yes/No)
 
-- ✓ スキルシートの公開Web表示 (default 1本)
-- ✓ Excel出力
+**v1 リリース期限: 撤回(納得行くまで作り込む)。優先方針: web 表現優先(楽しい優先) + スキルシート機能維持。**
+
+- ✓ スキルシートの公開Web表示 (`/` トップ + 詳細ページ等)
+- ✓ **ターミナル風 UI による世界観演出** (黒背景 + monospace、`cat` / `tree` / `ls` / `grep` 等のコマンド出力で情報を表示。Three.js は不採用 = 自作3Dの作り込みコストと外部3Dモデルのライセンス問題を回避)
+- ✓ **モード切替**: 右下のアニメーション停止ボタン(localStorage 連動)+ URL `?plain=1` で強制 Plain。Plain モードは普通の HTML スキルシート
+- ✓ Excel → YAML 移行スクリプト (`scripts/migrate-excel.ts`、1回きり)
+- ✓ Excel 出力 (営業/面談者向け配布)
 - ✓ ローカル(private)ビルドでの自分用閲覧 + メモ機能
+- ✓ プロジェクト詳細ページ (`/projects/[slug]/`)
+- ✓ タグページ (`/tags/[name]/`)(優先度低、後追い)
+- ✓ フィルタ UI(優先度低、後追い)
+- ✓ 漏洩チェックスクリプト
 - ✕ 認証機能
 - ✕ 動的なデータ書き込み (UI からの編集)
 - ✕ 案件管理機能 (v2 で別途検討)
