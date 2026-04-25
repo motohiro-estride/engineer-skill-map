@@ -16,7 +16,7 @@ engineer-skill-map v1 の論理データモデル。元データ (`private/` 配
 各フィールドは下記いずれかのレベルに属する:
 
 | レベル | 公開Web | Excel | ローカル | 例 |
-|---|---|---|---|---|
+| --- | --- | --- | --- | --- |
 | **全公開** | ○ | ○ | ○ | 自己PR、技術スタック、プロジェクト概要 |
 | **Excel-only** | ✕ | ○ | ○ | 氏名、最寄駅、勤務開始可能日、生年月日 |
 | **自分のみ** | ✕ | ✕ | ○ | private_memo (Project / TechTag) |
@@ -28,7 +28,7 @@ engineer-skill-map v1 の論理データモデル。元データ (`private/` 配
 ## エンティティ一覧
 
 | エンティティ | 件数 | 役割 |
-|---|---|---|
+| --- | --- | --- |
 | Engineer | 1 | プロフィール (シングルトン) |
 | Project | 約32件 | 参画プロジェクト |
 | TechTag | 多数 | 技術タグ。評価レベルと自動算出フィールドを持つ |
@@ -41,9 +41,9 @@ engineer-skill-map v1 の論理データモデル。元データ (`private/` 配
 ## Engineer (シングルトン)
 
 | フィールド | 型 | 表示レベル | メモ |
-|---|---|---|---|
+| --- | --- | --- | --- |
 | 氏名 | string | Excel-only | |
-| 性別 | enum | 全公開 | |
+| 性別 | enum {男性, 女性} | 全公開 | |
 | 生年月日 | date | Excel-only | 年齢の自動算出元 |
 | 年齢 | int (derived) | 全公開 | 生年月日から自動算出 |
 | 国籍 | string | 全公開 | |
@@ -58,32 +58,22 @@ engineer-skill-map v1 の論理データモデル。元データ (`private/` 配
 | 自己PR | text | 全公開 | |
 | 経験年数 | int (derived) | 全公開 | 全 Project の期間レンジから自動算出 |
 | 資格[] | sub-entity | 全公開 | 下記 Qualification |
-| 英語能力 | sub-entity | 全公開 | 下記 LanguageSkill |
 
 ### Qualification (Engineer に N持ち)
 
 | フィールド | 型 |
-|---|---|
+| --- | --- |
 | 名称 | string |
 | 取得年月 | year-month |
 
-### LanguageSkill (Engineer に1つ)
-
-| フィールド | 型 |
-|---|---|
-| TOEIC点 | int (任意) |
-| 英検級 | string (任意) |
-| ビジネス会話 | enum {○, △, ✕} |
-| トラベル会話 | enum {○, △, ✕} |
-| 資料作成 | enum {○, △, ✕} |
-| 資料読解 | enum {○, △, ✕} |
+> **Note**: 当初は `LanguageSkill` (TOEIC/英検 + 4軸スキル) を持たせる想定だったが、2026-04-25 時点で **LanguageSkill 全体を廃止** に変更。将来必要になれば Engineer の sub-entity として再導入可。
 
 ---
 
 ## Project (約32件)
 
 | フィールド | 型 | 表示レベル | メモ |
-|---|---|---|---|
+| --- | --- | --- | --- |
 | 通し番号 | int | 全公開 | 自動採番 (時系列降順) |
 | プロジェクト名 | string | 全公開 | "某〇〇" or 実名 (実名は契約上承諾済の場合のみ) |
 | 開始年月 | year-month | 全公開 | |
@@ -106,7 +96,7 @@ engineer-skill-map v1 の論理データモデル。元データ (`private/` 配
 ### visibility ステータス (3値)
 
 | visibility | Web | Excel | 集計に含む | 詳細ページ | ローカル |
-|---|---|---|---|---|---|
+| --- | --- | --- | --- | --- | --- |
 | **default** (デフォルト) | ○ | ○ | ✓ | ○ | ○ |
 | **stats_only** | ✕ | ✕ | ✓ | ✕ (404) | ○ |
 | **archived** | ✕ | ✕ | ✕ | ✕ (404) | ○ |
@@ -122,28 +112,22 @@ engineer-skill-map v1 の論理データモデル。元データ (`private/` 配
 ## TechTag
 
 | フィールド | 型 | 表示レベル | メモ |
-|---|---|---|---|
+| --- | --- | --- | --- |
 | 名前 | string | 全公開 | 表示用。バージョンも別タグとして登録 (例: `React`, `React 18`, `React 17`) |
 | baseName | string | 全公開 | フィルタ集約用 (例: `React 18` の baseName は `React`) |
 | カテゴリ | enum | 全公開 | Language / Framework / OS / Middleware / Database / Tool / Cloud |
-| 評価レベル | enum {A, B, C, D, E} | 全公開 | MM の保有技術一覧由来 |
 | 累積経験年数 | float (derived) | 全公開 | 関連 Project の期間合計。`archived` 除外、`stats_only` 含む |
 | 関連プロジェクト件数 | int (derived) | 全公開 | 同集計ルール |
 | private_memo | text | 自分のみ | 「Reactと聞かれたら〜」のような切り口別カンペ |
 
-評価レベルの定義 (MM 由来):
-- **A**: 業務の独力遂行。業務課題発見・解決。後進教育
-- **B**: 業務の独力遂行
-- **C**: 業務を上位者指導のもと遂行
-- **D**: 実務を通じた学習経験あり
-- **E**: 学習経験あり
+> **Note**: 当初は MM の保有技術一覧から取った `evaluationLevel` (A〜E) を持たせる想定だったが、2026-04-25 時点で **評価レベルは概念ごと廃止**。代わりに `累積経験年数` と `関連プロジェクト件数` を客観指標として用いる。将来再導入する場合は `TechTag.public.evaluationLevel` として復活可。
 
 ---
 
 ## IndustryTag
 
 | フィールド | 型 |
-|---|---|
+| --- | --- |
 | 名前 | string |
 | (任意) 説明 | text |
 
@@ -155,7 +139,7 @@ engineer-skill-map v1 の論理データモデル。元データ (`private/` 配
 ## Role
 
 | フィールド | 型 |
-|---|---|
+| --- | --- |
 | 名前 | string |
 | 序列 | int | 表示順用 (PM > PL > サブリーダー > SE > PG など) |
 
@@ -170,7 +154,7 @@ engineer-skill-map v1 の論理データモデル。元データ (`private/` 配
 ## 派生フィールドの算出ルール
 
 | 派生フィールド | 算出元 | ルール |
-|---|---|---|
+| --- | --- | --- |
 | Engineer.年齢 | Engineer.生年月日 | 現在日付との差 |
 | Engineer.経験年数 | 全 Project の期間 | MIN(開始) 〜 MAX(終了) のレンジ。または期間積算のいずれか (要決定) |
 | Project.期間 | 開始年月, 終了年月 | "X年Yヶ月" |
@@ -182,7 +166,7 @@ engineer-skill-map v1 の論理データモデル。元データ (`private/` 配
 ## 元データとの対応
 
 | エンティティ | 主な元データ |
-|---|---|
+| --- | --- |
 | Engineer | MM冒頭 (技術経歴書ヘッダ) + スキルシート冒頭 (キャリアシートヘッダ) |
 | Project | MM (30件) + スキルシート (18件、2024年以降の最新分はこちらのみ) を統合 |
 | TechTag | MM の保有技術一覧 + 全 Project の使用技術 |
