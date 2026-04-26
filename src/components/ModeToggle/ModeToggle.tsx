@@ -63,7 +63,7 @@ export function ModeToggle() {
       aria-label={aria}
       title={aria}
       tabIndex={mode === "world" ? -1 : 0}
-      className="fixed right-4 bottom-4 z-50 rounded-md border border-white/20 bg-black/60 px-3 py-1.5 font-mono text-xs text-white/90 backdrop-blur-md transition-colors hover:bg-black/80"
+      className="fixed right-4 bottom-4 z-50 cursor-pointer rounded-md border border-white/20 bg-black/60 px-3 py-1.5 font-mono text-xs text-white/90 backdrop-blur-md transition-colors hover:bg-black/80"
     >
       {label}
     </button>
