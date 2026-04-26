@@ -1,0 +1,49 @@
+# ローカル専用（機密情報・実データ置き場）
+private/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# エディタ
+*.swp
+*.swo
+*~
+
+# 環境変数
+.env
+.env.*
+!.env.example
+
+# ログ
+*.log
+logs/
+
+# 依存関係（言語非依存で先に入れておく）
+node_modules/
+__pycache__/
+*.pyc
+.venv/
+venv/
+
+# ビルド成果物
+dist/
+dist-local/
+build/
+.next/
+out/
+
+# Astro
+.astro/
+
+# Yarn 4 (nodeLinker: node-modules モード)
+.yarn/*
+!.yarn/patches
+!.yarn/plugins
+!.yarn/releases
+!.yarn/sdks
+!.yarn/versions
+.pnp.*
+
+# IDE（共有設定はリポジトリに残す方針なら .vscode は除外しない）
+.idea/
