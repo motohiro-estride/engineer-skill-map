@@ -380,7 +380,7 @@ const age = engineer?.birthDate ? calculateAge(engineer.birthDate) : null;
                       variant="outline"
                       className="border-white/20 font-mono text-blue-100/70"
                     >
-                      No.{p.no}
+                      No.{parseInt(p.slug, 10)}
                     </Badge>
                     <h3 class="text-base font-semibold text-white">{p.name}</h3>
                     <span class="ml-auto text-xs text-blue-100/50 tabular-nums">

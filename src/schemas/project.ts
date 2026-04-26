@@ -22,7 +22,6 @@ const detailsSchema = z.object({
 });
 
 const publicProjectSchema = z.object({
-  no: z.number().int().positive(),
   name: z.string(),
   period: periodSchema,
   summary: z.string(),

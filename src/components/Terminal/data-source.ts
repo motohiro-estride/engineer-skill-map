@@ -189,7 +189,7 @@ export async function collectTerminalData(): Promise<TerminalData> {
       .filter((key) => p.phases[key])
       .map((key) => phaseLabels[key]);
     return {
-      no: p.no,
+      no: parseInt(p.slug, 10),
       slug: p.slug,
       name: p.name,
       periodStart: p.period.start,

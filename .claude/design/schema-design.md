@@ -72,7 +72,6 @@ me:                       # singleton。id key は `me` 固定
 ```yaml
 visibility: default       # "default" | "stats_only" | "archived" (デフォルト: default)
 public:
-  no: 1                   # 通し番号
   name: サンプル案件      # 顧客名 or "某〇〇" (実名は契約上承諾済の場合のみ)
   period:
     start: "2024-01"      # YYYY-MM 文字列
