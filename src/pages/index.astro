@@ -120,6 +120,11 @@ const age = engineer?.birthDate ? calculateAge(engineer.birthDate) : null;
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width" />
+    <link
+      rel="icon"
+      type="image/svg+xml"
+      href={`${import.meta.env.BASE_URL}favicon.svg`}
+    />
     <title>Engineer Skill Map</title>
     <script is:inline>
       // モード初期判定 (CSS が効くより先に data-mode を決め、FOUC を防ぐ)

@@ -8,7 +8,7 @@ const isPublic = process.env.BUILD_MODE === "public";
 
 export default defineConfig({
   site: "https://motohiro-estride.github.io",
-  base: isPublic ? "/engineer-skill-map" : "/",
+  base: isPublic ? "/engineer-skill-map/" : "/",
   integrations: [react()],
   vite: {
     plugins: [tailwindcss()],
