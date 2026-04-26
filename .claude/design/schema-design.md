@@ -73,6 +73,7 @@ me:                       # singleton。id key は `me` 固定
 visibility: default       # "default" | "stats_only" | "archived" (デフォルト: default)
 public:
   name: サンプル案件      # 顧客名 or "某〇〇" (実名は契約上承諾済の場合のみ)
+  company: some-co-a      # optional / Company の id を参照 (companies.yaml に定義)
   period:
     start: "2024-01"      # YYYY-MM 文字列
     end: null             # YYYY-MM 文字列 or null (進行中)
@@ -139,6 +140,19 @@ typescript:
 
 - `cumulativeYears` ← `baseName` で集約した Project 群の期間合計 (`archived` 除外、`stats_only` 含む)
 - `projectCount` ← 同集計ルールで件数
+
+### Company (`private/companies.yaml`、object 形式)
+
+```yaml
+some-co-a:
+  public:
+    name: 某A社
+    description: SES先 (匿名化)   # optional
+elemental-stride:
+  public:
+    name: Elemental Stride
+# selfOnly セクションはスキーマに optional として存在するが、v1 では使用しない
+```
 
 ### IndustryTag (`private/industry-tags.yaml`、object 形式)
 

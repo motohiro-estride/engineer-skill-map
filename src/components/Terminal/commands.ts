@@ -170,7 +170,9 @@ const catHandler: CommandHandler = (args, data, ctx) => {
         { text: `  no:          ${project.no}`, kind: "muted" },
         { text: `  period:      ${project.periodStart} 〜 ${project.periodEnd ?? "現在"} (${project.periodLabel})`, kind: "muted" },
       ];
+      if (project.companyName) out.push({ text: `  company:     @${project.companyName}`, kind: "muted" });
       if (project.roleName) out.push({ text: `  role:        ${project.roleName}`, kind: "muted" });
+      if (project.scale) out.push({ text: `  scale:       全体 ${project.scale.total}人 / チーム ${project.scale.team}人`, kind: "muted" });
       if (project.industryTags.length > 0) out.push({ text: `  industry:    ${project.industryTags.join(", ")}`, kind: "muted" });
       if (project.techTags.length > 0) out.push({ text: `  tech:        ${project.techTags.join(", ")}`, kind: "muted" });
       if (project.phases.length > 0) out.push({ text: `  phases:      ${project.phases.join(" / ")}`, kind: "muted" });

@@ -35,11 +35,13 @@ export interface TerminalData {
     no: number;
     slug: string;
     name: string;
+    companyName: string | null;
     periodStart: string;
     periodEnd: string | null;
     periodLabel: string;
     summary: string;
     roleName: string | null;
+    scale?: { total: number; team: number };
     techTags: string[];
     industryTags: string[];
     phases: string[];
@@ -70,6 +72,7 @@ export async function collectTerminalData(): Promise<TerminalData> {
   const techTagEntries = await getCollection("techTags");
   const industryTagEntries = await getCollection("industryTags");
   const roleEntries = await getCollection("roles");
+  const companyEntries = await getCollection("companies");
 
   const techTagsLookup = buildLookup(
     techTagEntries.map((e) => ({ id: e.id, data: e.data })),
@@ -79,6 +82,9 @@ export async function collectTerminalData(): Promise<TerminalData> {
   );
   const rolesLookup = buildLookup(
     roleEntries.map((e) => ({ id: e.id, data: e.data })),
+  );
+  const companiesLookup = buildLookup(
+    companyEntries.map((e) => ({ id: e.id, data: e.data })),
   );
 
   const allProjects = projectEntries.map((e) => ({
@@ -194,15 +200,18 @@ export async function collectTerminalData(): Promise<TerminalData> {
     const phases = phaseOrder
       .filter((key) => p.phases[key])
       .map((key) => phaseLabels[key]);
+    const company = p.company ? companiesLookup.get(p.company) : undefined;
     return {
       no: parseInt(p.slug, 10),
       slug: p.slug,
       name: p.name,
+      companyName: company?.public.name ?? p.company ?? null,
       periodStart: p.period.start,
       periodEnd: p.period.end,
       periodLabel: calculatePeriodLabel(p.period),
       summary: p.summary,
       roleName: role?.public.name ?? null,
+      scale: p.scale,
       techTags,
       industryTags,
       phases,

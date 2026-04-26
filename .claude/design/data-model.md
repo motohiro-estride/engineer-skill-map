@@ -76,6 +76,7 @@ engineer-skill-map v1 の論理データモデル。元データ (`private/` 配
 | --- | --- | --- | --- |
 | 通し番号 | int (derived) | 全公開 | ファイル名 (`<NN>.yaml`) から導出。yaml 内には保持しない。時系列降順で `01.yaml` が最新 (Phase 2 の `add` コマンドで自動リネーム予定、現状は手動管理) |
 | プロジェクト名 | string | 全公開 | "某〇〇" or 実名 (実名は契約上承諾済の場合のみ) |
+| 会社名 (company) | Company 参照 (optional) | 全公開 | 同じ会社で複数案件参画した場合のグルーピング用。`companies.yaml` の id を参照。同 id が 2件以上ある時は「リピート参画」セクションで強調 |
 | 開始年月 | year-month | 全公開 | |
 | 終了年月 | year-month \| null | 全公開 | 進行中は null |
 | 期間 | string (derived) | 全公開 | "X年Yヶ月" 自動算出 |
@@ -121,6 +122,20 @@ engineer-skill-map v1 の論理データモデル。元データ (`private/` 配
 | private_memo | text | 自分のみ | 「Reactと聞かれたら〜」のような切り口別カンペ |
 
 > **Note**: 当初は MM の保有技術一覧から取った `evaluationLevel` (A〜E) を持たせる想定だったが、2026-04-25 時点で **評価レベルは概念ごと廃止**。代わりに `累積経験年数` と `関連プロジェクト件数` を客観指標として用いる。将来再導入する場合は `TechTag.public.evaluationLevel` として復活可。
+
+---
+
+## Company
+
+参画した会社/顧客のマスター。同じ会社で複数案件を担当した場合のグルーピングに使う。
+
+| フィールド | 型 |
+| --- | --- |
+| 名前 | string |
+| (任意) 説明 | text |
+
+例: `某A社`, `Elemental Stride` など。`Project.public.company` から id 参照。
+ぼかし表記可 (id は `some-co-a` のように匿名化、name は `某A社`)。
 
 ---
 

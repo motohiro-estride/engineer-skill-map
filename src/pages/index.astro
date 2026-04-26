@@ -32,6 +32,7 @@ const projectEntries = await getCollection("projects");
 const techTagEntries = await getCollection("techTags");
 const industryTagEntries = await getCollection("industryTags");
 const roleEntries = await getCollection("roles");
+const companyEntries = await getCollection("companies");
 
 // 参照解決用 Lookup
 const techTagsLookup = buildLookup(
@@ -42,6 +43,9 @@ const industryTagsLookup = buildLookup(
 );
 const rolesLookup = buildLookup(
   roleEntries.map((e) => ({ id: e.id, data: e.data })),
+);
+const companiesLookup = buildLookup(
+  companyEntries.map((e) => ({ id: e.id, data: e.data })),
 );
 
 // プロジェクトを展開
@@ -61,6 +65,29 @@ const visibleProjects = allProjects
   });
 
 const statsProjects = allProjects.filter((p) => isProjectInStats(p.visibility));
+
+// 同じ company の参画回数 + 案件リスト (2+ 件あればリピート参画として front に出す)
+const companyEngagements = new Map<
+  string,
+  { id: string; name: string; projects: typeof visibleProjects }
+>();
+for (const p of visibleProjects) {
+  if (!p.company) continue;
+  const display = companiesLookup.get(p.company)?.public.name ?? p.company;
+  const existing = companyEngagements.get(p.company);
+  if (existing) {
+    existing.projects.push(p);
+  } else {
+    companyEngagements.set(p.company, {
+      id: p.company,
+      name: display,
+      projects: [p],
+    });
+  }
+}
+const multiEngagementCompanies = Array.from(companyEngagements.values())
+  .filter((c) => c.projects.length >= 2)
+  .sort((a, b) => b.projects.length - a.projects.length);
 
 // 集計: 技術タグの累積経験年数 (baseName で集約)
 const projectsWithBaseNames = statsProjects.map((p) => ({
@@ -367,6 +394,51 @@ const age = engineer?.birthDate ? calculateAge(engineer.birthDate) : null;
         </Card>
       </section>
 
+      <!-- 複数案件参画した会社 (リピート参画) -->
+      {
+        multiEngagementCompanies.length > 0 && (
+          <section>
+            <h2 class="mb-4 flex items-baseline gap-2 text-xl font-semibold text-white">
+              複数案件参画した会社
+              <span class="text-sm font-normal text-emerald-100/50">
+                ({multiEngagementCompanies.length}社)
+              </span>
+            </h2>
+            <div class="grid gap-3 md:grid-cols-2">
+              {multiEngagementCompanies.map((c) => (
+                <Card className="bg-card/40 border-emerald-300/20 backdrop-blur-md">
+                  <CardHeader className="pb-3">
+                    <div class="flex items-baseline gap-2">
+                      <h3 class="text-base font-semibold text-white">
+                        @{c.name}
+                      </h3>
+                      <Badge className="bg-emerald-400/20 text-emerald-50 border-emerald-300/40">
+                        ×{c.projects.length}件
+                      </Badge>
+                    </div>
+                  </CardHeader>
+                  <CardContent className="pt-0">
+                    <ul class="space-y-1 text-xs text-blue-100/70">
+                      {c.projects.map((p) => (
+                        <li class="flex items-baseline gap-2">
+                          <span class="font-mono text-blue-200/40 tabular-nums">
+                            No.{parseInt(p.slug, 10)}
+                          </span>
+                          <span class="flex-1 truncate">{p.name}</span>
+                          <span class="text-blue-100/40 tabular-nums">
+                            {p.period.start}
+                          </span>
+                        </li>
+                      ))}
+                    </ul>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          </section>
+        )
+      }
+
       <!-- プロジェクト一覧 -->
       <section>
         <h2 class="mb-4 flex items-baseline gap-2 text-xl font-semibold text-white">
@@ -379,6 +451,9 @@ const age = engineer?.birthDate ? calculateAge(engineer.birthDate) : null;
           {
             visibleProjects.map((p) => {
               const role = resolveRole(p.role, rolesLookup);
+              const phaseList = phaseOrder
+                .filter((k) => p.phases[k])
+                .map((k) => phaseLabels[k]);
               return (
                 <article class="bg-card/40 space-y-2 rounded-lg border border-white/10 p-4 backdrop-blur-md">
                   <div class="flex flex-wrap items-baseline gap-2">
@@ -397,12 +472,48 @@ const age = engineer?.birthDate ? calculateAge(engineer.birthDate) : null;
                   <p class="text-sm leading-relaxed whitespace-pre-line text-blue-50/70">
                     {p.summary}
                   </p>
+                  {(p.scale || phaseList.length > 0) && (
+                    <div class="space-y-0.5 text-xs text-blue-100/60">
+                      {p.scale && (
+                        <div>
+                          <span class="text-blue-200/40">規模</span>: 全体
+                          {" "}{p.scale.total}人 / チーム {p.scale.team}人
+                        </div>
+                      )}
+                      {phaseList.length > 0 && (
+                        <div>
+                          <span class="text-blue-200/40">担当工程</span>:{" "}
+                          {phaseList.join(" / ")}
+                        </div>
+                      )}
+                    </div>
+                  )}
                   <div class="flex flex-wrap gap-1.5">
                     {role && (
                       <Badge className="bg-blue-500/30 text-blue-50 border-blue-300/30">
                         {role.public.name}
                       </Badge>
                     )}
+                    {p.company &&
+                      (() => {
+                        const engagement = companyEngagements.get(p.company);
+                        const displayName = engagement?.name ?? p.company;
+                        const count = engagement?.projects.length ?? 0;
+                        const isMulti = count >= 2;
+                        return (
+                          <Badge
+                            variant="outline"
+                            className={
+                              isMulti
+                                ? "border-emerald-300/50 bg-emerald-400/20 text-[10px] text-emerald-50"
+                                : "border-emerald-300/30 bg-emerald-400/10 text-[10px] text-emerald-100/80"
+                            }
+                          >
+                            @{displayName}
+                            {isMulti && ` ×${count}`}
+                          </Badge>
+                        );
+                      })()}
                     {p.techTags.map((id) => {
                       const tag = resolveTechTag(id, techTagsLookup);
                       return tag ? (

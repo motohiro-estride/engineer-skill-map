@@ -23,6 +23,7 @@ const detailsSchema = z.object({
 
 const publicProjectSchema = z.object({
   name: z.string(),
+  company: z.string().optional(),
   period: periodSchema,
   summary: z.string(),
   role: z.string(),

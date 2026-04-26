@@ -2,6 +2,7 @@ import { defineCollection } from "astro:content";
 import { glob, file } from "astro/loaders";
 
 import {
+  companySchema,
   engineerFileSchema,
   industryTagSchema,
   projectFileSchema,
@@ -34,4 +35,9 @@ const roles = defineCollection({
   schema: roleSchema,
 });
 
-export const collections = { projects, engineer, techTags, industryTags, roles };
+const companies = defineCollection({
+  loader: file("./private/companies.yaml"),
+  schema: companySchema,
+});
+
+export const collections = { projects, engineer, techTags, industryTags, roles, companies };
