@@ -86,9 +86,15 @@ export async function collectTerminalData(): Promise<TerminalData> {
     slug: e.id,
   }));
 
+  // period.start desc + 同期間時は slug ASC (= No 昇順) で安定化
   const visibleProjects = allProjects
     .filter((p) => isProjectVisible(p.visibility, mode))
-    .sort((a, b) => (a.period.start < b.period.start ? 1 : -1));
+    .sort((a, b) => {
+      if (a.period.start !== b.period.start) {
+        return a.period.start < b.period.start ? 1 : -1;
+      }
+      return parseInt(a.slug, 10) - parseInt(b.slug, 10);
+    });
 
   const statsProjects = allProjects.filter((p) => isProjectInStats(p.visibility));
 
