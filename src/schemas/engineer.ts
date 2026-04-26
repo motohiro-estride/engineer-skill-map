@@ -21,6 +21,7 @@ const overtimeSchema = z.object({
 const trinaryAvailabilitySchema = z.enum(["可", "不可", "応相談"]);
 
 const publicEngineerSchema = z.object({
+  name: z.string(),
   gender: z.enum(["男性", "女性"]),
   nationality: z.string(),
   finalEducation: z.string(),
@@ -34,10 +35,9 @@ const publicEngineerSchema = z.object({
 });
 
 const excelOnlyEngineerSchema = z.object({
-  name: z.string(),
-  birthDate: dateSchema,
-  station: stationSchema,
-  workableFrom: dateSchema,
+  birthDate: dateSchema.optional(),
+  station: stationSchema.optional(),
+  workableFrom: dateSchema.optional(),
 });
 
 export const engineerFileSchema = z.object({

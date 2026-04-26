@@ -80,6 +80,12 @@
   margin-right: 0.5em;
 }
 
+.term-prompt-cwd {
+  color: #8aa7d6;
+  margin-right: 0.5em;
+  font-weight: 500;
+}
+
 .term-typed {
   color: #e6f1ff;
 }

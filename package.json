@@ -10,7 +10,6 @@
     "build:excel": "BUILD_MODE=excel tsx scripts/build-excel.ts",
     "verify": "tsx scripts/verify-no-leak.ts",
     "deploy": "yarn build && gh-pages -d dist",
-    "migrate": "tsx scripts/migrate-excel.ts",
     "preview": "astro preview",
     "astro": "astro"
   },

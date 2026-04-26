@@ -32,9 +32,10 @@
 ```yaml
 me:                       # singleton。id key は `me` 固定
   public:
+    name: MM              # ぼかし表記 (イニシャル等) で記載。実名は yaml に書かない (data-model.md 参照)
     gender: 男性          # "男性" | "女性"
     nationality: 日本
-    finalEducation: ○○大学卒
+    finalEducation: 関東私文大学卒    # ぼかし表記で記載。実名校名は yaml に書かない (data-model.md 参照)
     workableArea: 都内
     overtime:
       available: true
@@ -48,15 +49,18 @@ me:                       # singleton。id key は `me` 固定
       - name: 基本情報技術者
         acquiredYearMonth: "2015-04"     # YYYY-MM 文字列
   excelOnly:
-    name: サンプル太郎
-    birthDate: "1990-01-01"               # YYYY-MM-DD 文字列。年齢の算出元
-    station:
+    birthDate: "1990-01-01"               # optional / YYYY-MM-DD 文字列。年齢の算出元
+    station:                               # optional / 全体オブジェクト
       line: ○○線
       station: ○○駅
       walkMinutes: 5                      # optional
       busMinutes: 10                       # optional (どちらか or 両方)
-    workableFrom: "2026-05-01"             # YYYY-MM-DD 文字列
+    workableFrom: "2026-05-01"             # optional / YYYY-MM-DD 文字列
 ```
+
+> **`excelOnly` の optional 化について** (2026-04-26 追記): 元 Excel に生年月日が無く、移行直後は空のまま運用するため、`birthDate` / `station` / `workableFrom` を **optional** に変更。Excel 出力 / 表示層は undefined を許容する実装にする。
+>
+> **`name` を public に格上げ** (2026-04-26 追記): 当初は `excelOnly` に置いていたが、ぼかし表記 (例: `MM`) で yaml に書く方針 (実名は書かない) に変更したため、Web/Excel/local 全配布形態で同一表示にするよう `public` セクションへ移動。
 
 派生フィールド (Engineer):
 

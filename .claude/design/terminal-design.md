@@ -102,11 +102,10 @@ src/types/glsl.d.ts              # → 削除
 3. コマンド定義(`commands.ts`)— `whoami` / `cat profile.md` / `tree projects/` / `clear` / `help`
 4. データ接続(`data-source.ts`)— Astro Content Layer から取得して commands に渡す
 5. `index.astro` を組み替え(World 削除、Terminal を主役に)
-6. データ移行(D-2、Excel→YAML、`scripts/migrate-excel.ts`)
-7. コマンド拡張: `ls`, `grep`, `stats`, etc
-8. ユーザー入力モード(自動再生終了後のプロンプト + キー入力)
-9. コマンド履歴(↑↓)・補完(Tab、将来)
-10. 演出微調整(色、速度、pause)
+6. コマンド拡張: `ls`, `grep`, `stats`, etc
+7. ユーザー入力モード(自動再生終了後のプロンプト + キー入力)
+8. コマンド履歴(↑↓)・補完(Tab、将来)
+9. 演出微調整(色、速度、pause)
 
 ## v2 以降で検討する拡張
 

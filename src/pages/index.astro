@@ -82,9 +82,10 @@ const uniqueTechTagStats = Array.from(baseNameMap.values())
   .filter((t) => t.cumulativeYears > 0 || t.projectCount > 0)
   .sort((a, b) => b.cumulativeYears - a.cumulativeYears);
 
+// 経験年数は「業界に居る期間」(暦レンジ) として archived も含める
 const experienceYears =
-  statsProjects.length > 0
-    ? calculateExperienceYears(statsProjects.map((p) => p.period))
+  allProjects.length > 0
+    ? calculateExperienceYears(allProjects.map((p) => p.period))
     : 0;
 
 const phaseCounts = phaseOrder.map((key) => ({
@@ -102,9 +103,16 @@ const roleCounts = Array.from(rolesLookup.entries())
   }))
   .sort((a, b) => a.rank - b.rank);
 
-const maxTechYears = uniqueTechTagStats[0]?.cumulativeYears ?? 1;
-const age =
-  engineer && "birthDate" in engineer ? calculateAge(engineer.birthDate) : null;
+// 主要技術ヒートマップは Language/Framework のみ。Cloud/OS/Middleware/Tool/Database は「その他経験技術」枠に分離
+const heatmapTechs = uniqueTechTagStats.filter(
+  (t) => t.category === "Language" || t.category === "Framework",
+);
+const otherTechs = uniqueTechTagStats.filter(
+  (t) => t.category !== "Language" && t.category !== "Framework",
+);
+const maxTechYears = heatmapTechs[0]?.cumulativeYears ?? 1;
+const primaryTech = heatmapTechs[0];
+const age = engineer?.birthDate ? calculateAge(engineer.birthDate) : null;
 ---
 
 <!doctype html>
@@ -115,10 +123,11 @@ const age =
     <title>Engineer Skill Map</title>
     <script is:inline>
       // モード初期判定 (CSS が効くより先に data-mode を決め、FOUC を防ぐ)
+      // 既定: plain (初回訪問は HTML スキルシート)。localStorage で "world" を選択していれば world
       (function () {
         try {
           var params = new URLSearchParams(window.location.search);
-          var mode = "world";
+          var mode = "plain";
           if (params.get("plain") === "1") {
             mode = "plain";
           } else if (
@@ -128,11 +137,11 @@ const age =
             mode = "plain";
           } else {
             var stored = localStorage.getItem("skillmap.mode");
-            if (stored === "plain") mode = "plain";
+            if (stored === "world") mode = "world";
           }
           document.documentElement.dataset.mode = mode;
         } catch (e) {
-          document.documentElement.dataset.mode = "world";
+          document.documentElement.dataset.mode = "plain";
         }
       })();
     </script>
@@ -164,18 +173,13 @@ const age =
             <h1
               class="mt-2 text-4xl font-bold tracking-tight text-white md:text-6xl"
             >
-              {
-                engineer && "name" in engineer
-                  ? engineer.name
-                  : "エンジニア スキルシート"
-              }
+              {engineer?.name || "エンジニア スキルシート"}
             </h1>
             {
               engineer && (
                 <p class="mt-3 text-sm text-blue-100/70">
                   {age && `${age}歳`}
                   {engineer.gender && ` ・ ${engineer.gender}`}
-                  {engineer.workableArea && ` ・ ${engineer.workableArea}`}
                 </p>
               )
             }
@@ -219,7 +223,7 @@ const age =
               主要技術
             </p>
             <p class="mt-1 truncate text-2xl font-bold text-white">
-              {uniqueTechTagStats[0]?.baseName ?? "-"}
+              {primaryTech?.baseName ?? "-"}
             </p>
           </div>
           <div
@@ -251,35 +255,45 @@ const age =
       <section>
         <h2 class="mb-4 text-xl font-semibold text-white">主要技術</h2>
         <Card className="bg-card/40 border-white/10 backdrop-blur-md">
-          <CardContent className="pt-6">
+          <CardContent className="space-y-4 pt-6">
             {
-              uniqueTechTagStats.length === 0 ? (
+              heatmapTechs.length === 0 ? (
                 <p class="text-muted-foreground text-sm">技術タグ未登録</p>
               ) : (
                 <ul class="space-y-2.5">
-                  {uniqueTechTagStats.slice(0, 12).map((t) => (
-                    <li class="flex items-center gap-3 text-sm">
+                  {heatmapTechs.slice(0, 12).map((t) => (
+                    <li class="grid grid-cols-[88px_128px_minmax(0,1fr)_auto] items-center gap-3 text-sm">
                       <Badge
                         variant="outline"
-                        className="border-white/20 font-mono text-[10px] text-blue-100/80"
+                        className="justify-center border-white/20 font-mono text-[10px] text-blue-100/80"
                       >
                         {t.category}
                       </Badge>
-                      <span class="w-32 truncate font-medium text-white">
+                      <span class="truncate font-medium text-white">
                         {t.baseName}
                       </span>
-                      <div class="h-1.5 max-w-[280px] flex-1 overflow-hidden rounded-full bg-white/10">
+                      <div class="h-1.5 max-w-[280px] overflow-hidden rounded-full bg-white/10">
                         <div
                           class="h-full rounded-full bg-gradient-to-r from-blue-400 to-cyan-300"
                           style={`width: ${Math.min(100, (t.cumulativeYears / maxTechYears) * 100)}%`}
                         />
                       </div>
-                      <span class="w-24 text-right text-xs tabular-nums text-blue-100/60">
+                      <span class="text-right text-xs tabular-nums text-blue-100/60">
                         {t.cumulativeYears}年・{t.projectCount}件
                       </span>
                     </li>
                   ))}
                 </ul>
+              )
+            }
+            {
+              otherTechs.length > 0 && (
+                <div class="border-t border-white/10 pt-3 text-xs leading-relaxed text-blue-100/50">
+                  <span class="mr-2 text-[10px] tracking-widest text-blue-200/60 uppercase">
+                    その他
+                  </span>
+                  {otherTechs.map((t) => t.baseName).join(" · ")}
+                </div>
               )
             }
           </CardContent>

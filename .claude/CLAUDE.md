@@ -75,7 +75,6 @@
 - ✓ スキルシートの公開Web表示 (`/` トップ + 詳細ページ等)
 - ✓ **ターミナル風 UI による世界観演出** (黒背景 + monospace、`cat` / `tree` / `ls` / `grep` 等のコマンド出力で情報を表示。Three.js は不採用 = 自作3Dの作り込みコストと外部3Dモデルのライセンス問題を回避)
 - ✓ **モード切替**: 右下のアニメーション停止ボタン(localStorage 連動)+ URL `?plain=1` で強制 Plain。Plain モードは普通の HTML スキルシート
-- ✓ Excel → YAML 移行スクリプト (`scripts/migrate-excel.ts`、1回きり)
 - ✓ Excel 出力 (営業/面談者向け配布)
 - ✓ ローカル(private)ビルドでの自分用閲覧 + メモ機能
 - ✓ プロジェクト詳細ページ (`/projects/[slug]/`)

@@ -22,6 +22,7 @@ const autoplayJson = JSON.stringify(autoplay);
     <div class="term-output" id="term-output"></div>
   </div>
   <div class="term-prompt-line" id="term-prompt-line">
+    <span class="term-prompt-cwd" id="term-prompt-cwd">~</span>
     <span class="term-prompt-symbol">❯</span>
     <span class="term-input-display" id="term-input-display"></span>
     <span class="term-cursor" id="term-cursor" aria-hidden="true"></span>
@@ -43,7 +44,7 @@ const autoplayJson = JSON.stringify(autoplay);
   const elements = {
     output: document.getElementById("term-output")!,
     promptLine: document.getElementById("term-prompt-line")!,
-    prompt: document.getElementById("term-prompt-line")!.querySelector(".term-prompt-symbol") as HTMLElement,
+    promptCwd: document.getElementById("term-prompt-cwd")!,
     inputDisplay: document.getElementById("term-input-display")!,
     cursor: document.getElementById("term-cursor")!,
     rootScroll: document.getElementById("term-scroll")!,

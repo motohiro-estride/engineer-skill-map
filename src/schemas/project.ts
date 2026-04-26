@@ -27,7 +27,7 @@ const publicProjectSchema = z.object({
   period: periodSchema,
   summary: z.string(),
   role: z.string(),
-  scale: scaleSchema,
+  scale: scaleSchema.optional(),
   phases: phasesSchema,
   techTags: z.array(z.string()),
   industryTags: z.array(z.string()),

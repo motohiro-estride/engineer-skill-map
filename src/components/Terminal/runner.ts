@@ -2,12 +2,12 @@
 // DOM 操作は本ファイルに集約。コマンド出力の生成は commands.ts、データ取得は data-source.ts。
 
 import type { TerminalData } from "./data-source";
-import { runCommand, type CommandLine } from "./commands";
+import { runCommand, getCompletions, type CommandLine } from "./commands";
 
 export interface TerminalElements {
   output: HTMLElement;
   promptLine: HTMLElement;
-  prompt: HTMLElement;
+  promptCwd: HTMLElement;
   inputDisplay: HTMLElement;
   cursor: HTMLElement;
   rootScroll: HTMLElement;
@@ -39,6 +39,7 @@ export class TerminalRunner {
   private history: string[] = [];
   private historyIndex = -1;
   private inputEnabled = false;
+  private cwd = "~";
 
   constructor(opts: Options) {
     this.data = opts.data;
@@ -52,6 +53,7 @@ export class TerminalRunner {
   async start(): Promise<void> {
     this.attachKeyListener();
     this.hidePrompt();
+    this.updatePromptCwd();
     await this.runAutoplay();
     this.enableUserInput();
   }
@@ -71,7 +73,7 @@ export class TerminalRunner {
     // プロンプト行を表示し、コマンドを1文字ずつ追加
     const promptEl = document.createElement("div");
     promptEl.className = "term-line term-prompt-input";
-    promptEl.innerHTML = `<span class="term-prompt-symbol">❯</span> <span class="term-typed"></span>`;
+    promptEl.innerHTML = `<span class="term-prompt-cwd">${escapeHtml(this.cwd)}</span> <span class="term-prompt-symbol">❯</span> <span class="term-typed"></span>`;
     this.el.output.appendChild(promptEl);
     const typedEl = promptEl.querySelector(".term-typed") as HTMLElement;
 
@@ -90,7 +92,11 @@ export class TerminalRunner {
     }
 
     // コマンド実行 → 出力
-    const result = runCommand(cmd, this.data);
+    const result = runCommand(cmd, this.data, { cwd: this.cwd });
+    if (result.newCwd) {
+      this.cwd = result.newCwd;
+      this.updatePromptCwd();
+    }
     for (const line of result.lines) {
       if (this.autoplayCancelled) break;
       this.appendLine(line);
@@ -101,7 +107,7 @@ export class TerminalRunner {
   private appendLine(line: CommandLine): void {
     const el = document.createElement("div");
     el.className = `term-line term-line-${line.kind ?? "default"}`;
-    el.textContent = line.text || " "; // 空行を高さ持たせる
+    el.textContent = line.text || " "; // 空行を高さ持たせる
     this.el.output.appendChild(el);
     this.scrollToBottom();
   }
@@ -124,6 +130,10 @@ export class TerminalRunner {
     this.el.promptLine.style.visibility = "visible";
     this.el.inputDisplay.textContent = this.inputBuffer;
     this.scrollToBottom();
+  }
+
+  private updatePromptCwd(): void {
+    this.el.promptCwd.textContent = this.cwd;
   }
 
   private enableUserInput(): void {
@@ -154,6 +164,9 @@ export class TerminalRunner {
     if (e.key === "Enter") {
       this.submitInput();
       e.preventDefault();
+    } else if (e.key === "Tab") {
+      e.preventDefault();
+      this.handleTab();
     } else if (e.key === "Backspace") {
       this.inputBuffer = this.inputBuffer.slice(0, -1);
       this.el.inputDisplay.textContent = this.inputBuffer;
@@ -168,6 +181,54 @@ export class TerminalRunner {
       this.inputBuffer += e.key;
       this.el.inputDisplay.textContent = this.inputBuffer;
     }
+  }
+
+  // --- Tab 補完 ---
+
+  private handleTab(): void {
+    const buf = this.inputBuffer;
+    const candidates = getCompletions(buf, this.data, { cwd: this.cwd });
+    if (candidates.length === 0) return;
+
+    const trailingSpace = /\s$/.test(buf);
+    const trimmed = buf.trim();
+    const tokens = trimmed === "" ? [] : trimmed.split(/\s+/);
+    const lastToken = trailingSpace ? "" : tokens[tokens.length - 1] ?? "";
+
+    if (candidates.length === 1) {
+      this.replaceLastToken(lastToken, candidates[0]!);
+      return;
+    }
+
+    const lcp = longestCommonPrefix(candidates);
+    if (lcp.length > lastToken.length) {
+      this.replaceLastToken(lastToken, lcp);
+      return;
+    }
+
+    // LCP で進展なし → 候補一覧を表示
+    this.showCompletionCandidates(candidates);
+  }
+
+  private replaceLastToken(lastToken: string, replacement: string): void {
+    const buf = this.inputBuffer;
+    this.inputBuffer = buf.slice(0, buf.length - lastToken.length) + replacement;
+    this.el.inputDisplay.textContent = this.inputBuffer;
+  }
+
+  private showCompletionCandidates(candidates: string[]): void {
+    // 現在のプロンプト + 入力中バッファを echo
+    const echo = document.createElement("div");
+    echo.className = "term-line term-prompt-input";
+    echo.innerHTML = `<span class="term-prompt-cwd">${escapeHtml(this.cwd)}</span> <span class="term-prompt-symbol">❯</span> <span class="term-typed">${escapeHtml(this.inputBuffer)}</span>`;
+    this.el.output.appendChild(echo);
+
+    // 候補一覧 (空白区切り)
+    const list = document.createElement("div");
+    list.className = "term-line term-line-muted";
+    list.textContent = candidates.join("  ");
+    this.el.output.appendChild(list);
+    this.scrollToBottom();
   }
 
   private recallHistory(direction: number): void {
@@ -195,7 +256,7 @@ export class TerminalRunner {
       // 空 Enter は新しいプロンプト行だけ
       const empty = document.createElement("div");
       empty.className = "term-line term-prompt-input";
-      empty.innerHTML = `<span class="term-prompt-symbol">❯</span>`;
+      empty.innerHTML = `<span class="term-prompt-cwd">${escapeHtml(this.cwd)}</span> <span class="term-prompt-symbol">❯</span>`;
       this.el.output.appendChild(empty);
       this.scrollToBottom();
       return;
@@ -211,6 +272,8 @@ export class TerminalRunner {
     if (cmd.trim() === "replay") {
       this.el.output.innerHTML = "";
       this.inputEnabled = false;
+      this.cwd = "~";
+      this.updatePromptCwd();
       this.hidePrompt();
       this.autoplayCancelled = false;
       this.runAutoplay().then(() => this.enableUserInput());
@@ -220,10 +283,14 @@ export class TerminalRunner {
     // 通常コマンド: 入力エコー + 実行 + 出力
     const echo = document.createElement("div");
     echo.className = "term-line term-prompt-input";
-    echo.innerHTML = `<span class="term-prompt-symbol">❯</span> <span class="term-typed">${escapeHtml(cmd)}</span>`;
+    echo.innerHTML = `<span class="term-prompt-cwd">${escapeHtml(this.cwd)}</span> <span class="term-prompt-symbol">❯</span> <span class="term-typed">${escapeHtml(cmd)}</span>`;
     this.el.output.appendChild(echo);
 
-    const result = runCommand(cmd, this.data);
+    const result = runCommand(cmd, this.data, { cwd: this.cwd });
+    if (result.newCwd) {
+      this.cwd = result.newCwd;
+      this.updatePromptCwd();
+    }
     for (const line of result.lines) {
       this.appendLine(line);
     }
@@ -236,4 +303,16 @@ function escapeHtml(s: string): string {
     .replace(/&/g, "&amp;")
     .replace(/</g, "&lt;")
     .replace(/>/g, "&gt;");
+}
+
+function longestCommonPrefix(strs: string[]): string {
+  if (strs.length === 0) return "";
+  let prefix = strs[0]!;
+  for (let i = 1; i < strs.length; i++) {
+    while (!strs[i]!.startsWith(prefix)) {
+      prefix = prefix.slice(0, -1);
+      if (prefix === "") return "";
+    }
+  }
+  return prefix;
 }

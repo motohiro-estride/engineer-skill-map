@@ -8,7 +8,7 @@ type Mode = "world" | "plain";
 const STORAGE_KEY = "skillmap.mode";
 
 function readInitialMode(): Mode {
-  if (typeof window === "undefined") return "world";
+  if (typeof window === "undefined") return "plain";
 
   const params = new URLSearchParams(window.location.search);
   if (params.get("plain") === "1") return "plain";
@@ -21,12 +21,12 @@ function readInitialMode(): Mode {
   }
 
   const stored = window.localStorage.getItem(STORAGE_KEY);
-  return stored === "plain" ? "plain" : "world";
+  return stored === "world" ? "world" : "plain";
 }
 
 export function ModeToggle() {
-  // SSR 整合のため初期 state は world、useEffect で実値を反映
-  const [mode, setMode] = useState<Mode>("world");
+  // SSR 整合のため初期 state は plain、useEffect で実値を反映
+  const [mode, setMode] = useState<Mode>("plain");
 
   useEffect(() => {
     // 起動時は inline script で dataset.mode が既に設定されている前提。
@@ -62,6 +62,7 @@ export function ModeToggle() {
       onClick={toggle}
       aria-label={aria}
       title={aria}
+      tabIndex={mode === "world" ? -1 : 0}
       className="fixed right-4 bottom-4 z-50 rounded-md border border-white/20 bg-black/60 px-3 py-1.5 font-mono text-xs text-white/90 backdrop-blur-md transition-colors hover:bg-black/80"
     >
       {label}

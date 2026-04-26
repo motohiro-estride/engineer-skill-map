@@ -42,21 +42,21 @@ engineer-skill-map v1 の論理データモデル。元データ (`private/` 配
 
 | フィールド | 型 | 表示レベル | メモ |
 | --- | --- | --- | --- |
-| 氏名 | string | Excel-only | |
+| 氏名 | string | 全公開 | **ぼかし表記** (イニシャル等、例: `MM`) で記載。実名は yaml に書かない (個人特定リスク回避) |
 | 性別 | enum {男性, 女性} | 全公開 | |
-| 生年月日 | date | Excel-only | 年齢の自動算出元 |
-| 年齢 | int (derived) | 全公開 | 生年月日から自動算出 |
+| 生年月日 | date | Excel-only | (任意) 元 Excel に無いので移行直後は未設定。年齢の算出元 |
+| 年齢 | int (derived) | 全公開 | 生年月日があれば自動算出 |
 | 国籍 | string | 全公開 | |
-| 最寄駅 | object{路線, 駅, 徒歩・バス分} | Excel-only | |
-| 最終学歴 | string | 全公開 | |
-| 勤務開始可能日 | date | Excel-only | 鮮度劣化が早い |
+| 最寄駅 | object{路線, 駅, 徒歩・バス分} | Excel-only | (任意) 元 Excel から取れない場合は未設定 |
+| 最終学歴 | string | 全公開 | **ぼかし表記**で記載 (例: `関東私文大学卒`)。実名校名は yaml に書かない (個人特定リスク回避) |
+| 勤務開始可能日 | date | Excel-only | (任意) 鮮度劣化が早い、移行時に取れなければ未設定 |
 | 勤務可能地域 | string | 全公開 | |
 | 残業可否 | object{可否, 上限h} | 全公開 | |
 | 休日出勤可否 | enum | 全公開 | |
 | 出張可否 | enum | 全公開 | |
 | 業務知識 | string | 全公開 | |
 | 自己PR | text | 全公開 | |
-| 経験年数 | int (derived) | 全公開 | 全 Project の期間レンジから自動算出 |
+| 経験年数 | float (derived) | 全公開 | 全 Project (**archived 含む**) の MIN(start) 〜 MAX(end) レンジから自動算出。「業界経験」を表すため OJT 等 archived も含める |
 | 資格[] | sub-entity | 全公開 | 下記 Qualification |
 
 ### Qualification (Engineer に N持ち)
@@ -81,8 +81,8 @@ engineer-skill-map v1 の論理データモデル。元データ (`private/` 配
 | 期間 | string (derived) | 全公開 | "X年Yヶ月" 自動算出 |
 | 概要 | text | 全公開 | |
 | 役割 | Role 参照 | 全公開 | マスタ |
-| 全体規模 | int | 全公開 | プロジェクト全体人数。表示時にカテゴリ化 (1-5名/6-10名/11-50名 等) |
-| チーム規模 | int | 全公開 | 自分のチーム人数 |
+| 全体規模 | int | 全公開 | (任意) プロジェクト全体人数。MM のみ案件は移行時に取得不可、後で補完 |
+| チーム規模 | int | 全公開 | (任意) 自分のチーム人数 |
 | 担当工程 | bool×6 | 全公開 | 要件定義/基本設計/詳細設計/製造/テスト/保守 |
 | 技術タグ[] | TechTag 参照 | 全公開 | M:N |
 | 業界タグ[] | IndustryTag 参照 | 全公開 | M:N、移行時に手動付与 |
@@ -156,7 +156,7 @@ engineer-skill-map v1 の論理データモデル。元データ (`private/` 配
 | 派生フィールド | 算出元 | ルール |
 | --- | --- | --- |
 | Engineer.年齢 | Engineer.生年月日 | 現在日付との差 |
-| Engineer.経験年数 | 全 Project の期間 | MIN(開始) 〜 MAX(終了) のレンジ。または期間積算のいずれか (要決定) |
+| Engineer.経験年数 | 全 Project の期間 (**archived 含む**) | MIN(start) 〜 MAX(end) のレンジ。archived (新人OJT 等) も「業界に居る期間」として含める。stats とは別系統 |
 | Project.期間 | 開始年月, 終了年月 | "X年Yヶ月" |
 | TechTag.累積経験年数 | 関連 Project の期間 | 合算。`archived` 除外、`stats_only` 含む |
 | TechTag.関連プロジェクト件数 | 関連 Project | COUNT。同集計ルール |

@@ -10,14 +10,30 @@ export interface CommandLine {
   kind?: "default" | "muted" | "highlight" | "error" | "comment" | "header";
 }
 
+export interface CommandContext {
+  /** 現在のカレントディレクトリ。例: "~", "~/projects" */
+  cwd: string;
+}
+
 export interface CommandResult {
   lines: CommandLine[];
+  /** 設定された場合、runner はこの値で cwd を更新する */
+  newCwd?: string;
 }
 
 export type CommandHandler = (
   args: string[],
   data: TerminalData,
+  ctx: CommandContext,
 ) => CommandResult;
+
+export const KNOWN_DIRS = [
+  "~",
+  "~/projects",
+  "~/tech-tags",
+  "~/industry-tags",
+  "~/roles",
+] as const;
 
 const padRight = (s: string, w: number): string =>
   s + " ".repeat(Math.max(0, w - displayWidth(s)));
@@ -34,14 +50,33 @@ function displayWidth(s: string): number {
   return w;
 }
 
+/** 入力パスを cwd 起点で絶対パス (~/...) に解決 */
+export function resolvePath(cwd: string, input: string): string {
+  if (!input || input === "~" || input === "/") return "~";
+  if (input === "..") {
+    if (cwd === "~") return "~";
+    const parts = cwd.split("/");
+    parts.pop();
+    return parts.join("/") || "~";
+  }
+  if (input.startsWith("~/")) return input.replace(/\/+$/, "");
+  if (input === "/" || input === "~") return "~";
+  // 相対パス
+  const cleaned = input.replace(/\/+$/, "");
+  if (cwd === "~") return `~/${cleaned}`;
+  return `${cwd}/${cleaned}`;
+}
+
 const helpHandler: CommandHandler = () => ({
   lines: [
     { text: "available commands:", kind: "header" },
     { text: "  whoami           profile summary", kind: "muted" },
-    { text: "  cat <file>       show file content (profile.md, projects/<slug>.md)", kind: "muted" },
-    { text: "  tree [<path>]    show directory tree (projects/, tech-tags/, ...)", kind: "muted" },
-    { text: "  ls [<path>]      list entries", kind: "muted" },
-    { text: "  grep <pat> <p>   search pattern in path", kind: "muted" },
+    { text: "  pwd              show current directory", kind: "muted" },
+    { text: "  cd <path>        change directory (projects, tech-tags, ..)", kind: "muted" },
+    { text: "  ls [<path>]      list entries (default: cwd)", kind: "muted" },
+    { text: "  tree [<path>]    show directory tree (default: cwd)", kind: "muted" },
+    { text: "  cat <file>       show file content (profile.md, 01, projects/01, ...)", kind: "muted" },
+    { text: "  grep <pat> [<p>] search pattern in path", kind: "muted" },
     { text: "  stats            aggregated stats", kind: "muted" },
     { text: "  clear            clear screen", kind: "muted" },
     { text: "  replay           replay autoplay", kind: "muted" },
@@ -56,7 +91,7 @@ const whoamiHandler: CommandHandler = (_args, data) => {
     return { lines: [{ text: "no engineer data", kind: "error" }] };
   }
   const lines: CommandLine[] = [];
-  const namePart = eng.name ? eng.name : "(name hidden in public mode)";
+  const namePart = eng.name;
   const meta: string[] = [];
   if (eng.age !== undefined) meta.push(`${eng.age}歳`);
   if (eng.gender) meta.push(eng.gender);
@@ -70,7 +105,25 @@ const whoamiHandler: CommandHandler = (_args, data) => {
   return { lines };
 };
 
-const catHandler: CommandHandler = (args, data) => {
+const pwdHandler: CommandHandler = (_args, _data, ctx) => ({
+  lines: [{ text: ctx.cwd }, { text: "" }],
+});
+
+const cdHandler: CommandHandler = (args, _data, ctx) => {
+  const target = resolvePath(ctx.cwd, args[0] ?? "");
+  if (!(KNOWN_DIRS as readonly string[]).includes(target)) {
+    return {
+      lines: [
+        { text: `cd: ${args[0] ?? ""}: No such directory`, kind: "error" },
+        { text: `(available: ${KNOWN_DIRS.slice(1).map((d) => d.replace("~/", "")).join(", ")})`, kind: "muted" },
+        { text: "" },
+      ],
+    };
+  }
+  return { lines: [], newCwd: target };
+};
+
+const catHandler: CommandHandler = (args, data, ctx) => {
   const file = args[0];
   if (!file) {
     return { lines: [{ text: "usage: cat <file>", kind: "error" }] };
@@ -96,11 +149,21 @@ const catHandler: CommandHandler = (args, data) => {
     }
     return { lines: out };
   }
-  // projects/<slug>.md or just <slug>
-  const projectMatch = file.match(/^(?:projects\/)?([^\/]+?)(?:\.md)?$/);
-  if (projectMatch) {
-    const slug = projectMatch[1];
-    const project = data.projects.find((p) => p.slug === slug || p.slug === `${slug}` || p.name === slug);
+  // projects/<slug> or just <slug> (cwd 連動)
+  // 拡張子 .md / .yaml は無視。数値だけの入力は zero-pad も試行 (`cat 1` → `01`)
+  const stripped = file.replace(/\.(md|yaml)$/, "");
+  const candidates: string[] = [];
+  const addCandidate = (s: string) => {
+    candidates.push(s);
+    if (/^\d+$/.test(s)) candidates.push(s.padStart(2, "0"));
+  };
+  // 1. cwd === "~/projects" の場合は素の slug をそのまま
+  if (ctx.cwd === "~/projects") addCandidate(stripped);
+  // 2. "projects/" prefix を許容
+  const m = stripped.match(/^(?:projects\/)?(.+)$/);
+  if (m) addCandidate(m[1]!);
+  for (const slug of candidates) {
+    const project = data.projects.find((p) => p.slug === slug || p.name === slug);
     if (project) {
       const out: CommandLine[] = [
         { text: `# ${project.name}`, kind: "highlight" },
@@ -130,9 +193,22 @@ const catHandler: CommandHandler = (args, data) => {
   return { lines: [{ text: `cat: ${file}: No such file or directory`, kind: "error" }] };
 };
 
-const treeHandler: CommandHandler = (args, data) => {
-  const path = args[0] ?? "projects/";
-  if (path === "projects/" || path === "projects" || path === "./projects") {
+const treeHandler: CommandHandler = (args, data, ctx) => {
+  const pathArg = args[0];
+  const resolved = pathArg ? resolvePath(ctx.cwd, pathArg) : ctx.cwd;
+
+  if (resolved === "~") {
+    const out: CommandLine[] = [{ text: "~", kind: "highlight" }];
+    const dirs = ["projects", "tech-tags", "industry-tags", "roles"];
+    dirs.forEach((d, i) => {
+      const isLast = i === dirs.length - 1;
+      const branch = isLast ? "└── " : "├── ";
+      out.push({ text: `${branch}${d}/` });
+    });
+    out.push({ text: "" });
+    return { lines: out };
+  }
+  if (resolved === "~/projects") {
     const out: CommandLine[] = [{ text: "projects/", kind: "highlight" }];
     data.projects.forEach((p, i) => {
       const isLast = i === data.projects.length - 1;
@@ -140,11 +216,11 @@ const treeHandler: CommandHandler = (args, data) => {
       out.push({ text: `${branch}${p.slug}` });
     });
     out.push({ text: "" });
-    out.push({ text: `${data.projects.length} directories`, kind: "muted" });
+    out.push({ text: `${data.projects.length} entries`, kind: "muted" });
     out.push({ text: "" });
     return { lines: out };
   }
-  if (path === "tech-tags/" || path === "tech-tags") {
+  if (resolved === "~/tech-tags") {
     const out: CommandLine[] = [{ text: "tech-tags/", kind: "highlight" }];
     data.techTags.forEach((t, i) => {
       const isLast = i === data.techTags.length - 1;
@@ -156,12 +232,22 @@ const treeHandler: CommandHandler = (args, data) => {
     out.push({ text: "" });
     return { lines: out };
   }
-  return { lines: [{ text: `tree: ${path}: No such file or directory`, kind: "error" }] };
+  return { lines: [{ text: `tree: ${pathArg ?? resolved}: No such directory`, kind: "error" }] };
 };
 
-const lsHandler: CommandHandler = (args, data) => {
-  const path = args.find((a) => !a.startsWith("-")) ?? "tech-tags/";
-  if (path === "tech-tags/" || path === "tech-tags") {
+const lsHandler: CommandHandler = (args, data, ctx) => {
+  const pathArg = args.find((a) => !a.startsWith("-"));
+  const resolved = pathArg ? resolvePath(ctx.cwd, pathArg) : ctx.cwd;
+
+  if (resolved === "~") {
+    const out: CommandLine[] = [];
+    for (const d of ["projects/", "tech-tags/", "industry-tags/", "roles/"]) {
+      out.push({ text: d, kind: "default" });
+    }
+    out.push({ text: "" });
+    return { lines: out };
+  }
+  if (resolved === "~/tech-tags") {
     const out: CommandLine[] = [];
     data.techTags.slice(0, 20).forEach((t) => {
       out.push({
@@ -172,7 +258,7 @@ const lsHandler: CommandHandler = (args, data) => {
     out.push({ text: "" });
     return { lines: out };
   }
-  if (path === "projects/" || path === "projects") {
+  if (resolved === "~/projects") {
     const out: CommandLine[] = [];
     data.projects.forEach((p) => {
       out.push({
@@ -182,16 +268,34 @@ const lsHandler: CommandHandler = (args, data) => {
     out.push({ text: "" });
     return { lines: out };
   }
-  return { lines: [{ text: `ls: ${path}: No such file or directory`, kind: "error" }] };
+  if (resolved === "~/industry-tags") {
+    const out: CommandLine[] = [];
+    data.industryCounts.forEach((i) => {
+      out.push({ text: `${padRight(i.name, 16)} ${i.count} prj` });
+    });
+    out.push({ text: "" });
+    return { lines: out };
+  }
+  if (resolved === "~/roles") {
+    const out: CommandLine[] = [];
+    data.roleCounts.forEach((r) => {
+      out.push({ text: `${padRight(r.name, 12)} ${r.count} prj` });
+    });
+    out.push({ text: "" });
+    return { lines: out };
+  }
+  return { lines: [{ text: `ls: ${pathArg ?? resolved}: No such file or directory`, kind: "error" }] };
 };
 
-const grepHandler: CommandHandler = (args, data) => {
+const grepHandler: CommandHandler = (args, data, ctx) => {
   const pattern = args[0];
-  const path = args[1] ?? "projects/";
+  const pathArg = args[1];
+  const resolved = pathArg ? resolvePath(ctx.cwd, pathArg) : ctx.cwd === "~" ? "~/projects" : ctx.cwd;
+
   if (!pattern) {
-    return { lines: [{ text: "usage: grep <pattern> <path>", kind: "error" }] };
+    return { lines: [{ text: "usage: grep <pattern> [<path>]", kind: "error" }] };
   }
-  if (path === "projects/" || path === "projects" || path === "-r") {
+  if (resolved === "~/projects") {
     const lower = pattern.toLowerCase();
     const matches = data.projects.filter(
       (p) =>
@@ -213,7 +317,7 @@ const grepHandler: CommandHandler = (args, data) => {
     out.push({ text: "" });
     return { lines: out };
   }
-  return { lines: [{ text: `grep: ${path}: No such file or directory`, kind: "error" }] };
+  return { lines: [{ text: `grep: ${pathArg ?? resolved}: No such file or directory`, kind: "error" }] };
 };
 
 const statsHandler: CommandHandler = (_args, data) => {
@@ -250,6 +354,8 @@ const statsHandler: CommandHandler = (_args, data) => {
 export const commands: Record<string, CommandHandler> = {
   help: helpHandler,
   whoami: whoamiHandler,
+  pwd: pwdHandler,
+  cd: cdHandler,
   cat: catHandler,
   tree: treeHandler,
   ls: lsHandler,
@@ -257,7 +363,82 @@ export const commands: Record<string, CommandHandler> = {
   stats: statsHandler,
 };
 
-export function runCommand(input: string, data: TerminalData): CommandResult {
+/** runner.ts の submitInput で特殊処理されるコマンド (commands には含まれない) */
+const RUNNER_LEVEL_COMMANDS = ["clear", "replay"] as const;
+
+/** 全コマンド名 (補完候補用) */
+export function allCommandNames(): string[] {
+  return [...Object.keys(commands), ...RUNNER_LEVEL_COMMANDS].sort();
+}
+
+/**
+ * 入力バッファに対する補完候補を返す。
+ * - 第1トークン位置: コマンド名候補
+ * - cd/ls/tree の引数: ディレクトリ候補 (cwd 連動)
+ * - cat の引数: profile.md + プロジェクト slug
+ * - grep の第2引数 (path): ディレクトリ候補
+ */
+export function getCompletions(
+  input: string,
+  data: TerminalData,
+  ctx: CommandContext,
+): string[] {
+  const trailingSpace = /\s$/.test(input);
+  const trimmed = input.trim();
+  const tokens = trimmed === "" ? [] : trimmed.split(/\s+/);
+
+  // コマンド名位置
+  if (trimmed === "" || (tokens.length <= 1 && !trailingSpace)) {
+    const prefix = tokens[0] ?? "";
+    return allCommandNames().filter((c) => c.startsWith(prefix));
+  }
+
+  const cmd = tokens[0]!;
+  const lastToken = trailingSpace ? "" : tokens[tokens.length - 1] ?? "";
+
+  if (cmd === "cd" || cmd === "ls" || cmd === "tree") {
+    return completeDirArg(lastToken, ctx);
+  }
+  if (cmd === "cat") {
+    return completeCatArg(lastToken, data, ctx);
+  }
+  if (cmd === "grep" && tokens.length + (trailingSpace ? 1 : 0) >= 3) {
+    // grep の path 引数 (第2引数) のみ補完
+    return completeDirArg(lastToken, ctx);
+  }
+  return [];
+}
+
+function completeDirArg(prefix: string, ctx: CommandContext): string[] {
+  const dirs: string[] = [];
+  if (ctx.cwd === "~") {
+    dirs.push("projects", "tech-tags", "industry-tags", "roles");
+  } else {
+    dirs.push("..", "~");
+  }
+  return dirs.filter((d) => d.startsWith(prefix)).sort();
+}
+
+function completeCatArg(
+  prefix: string,
+  data: TerminalData,
+  ctx: CommandContext,
+): string[] {
+  const files: string[] = [];
+  if (ctx.cwd === "~/projects") {
+    files.push(...data.projects.map((p) => p.slug));
+  } else {
+    files.push("profile.md");
+    files.push(...data.projects.map((p) => `projects/${p.slug}`));
+  }
+  return files.filter((f) => f.startsWith(prefix)).sort();
+}
+
+export function runCommand(
+  input: string,
+  data: TerminalData,
+  ctx: CommandContext,
+): CommandResult {
   const trimmed = input.trim();
   if (!trimmed) return { lines: [] };
   const tokens = trimmed.split(/\s+/);
@@ -273,5 +454,5 @@ export function runCommand(input: string, data: TerminalData): CommandResult {
       ],
     };
   }
-  return handler(args, data);
+  return handler(args, data, ctx);
 }

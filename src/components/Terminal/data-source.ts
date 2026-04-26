@@ -21,7 +21,7 @@ import {
 
 export interface TerminalData {
   engineer: {
-    name?: string;
+    name: string;
     age?: number;
     gender: string;
     nationality: string;
@@ -154,19 +154,18 @@ export async function collectTerminalData(): Promise<TerminalData> {
     count: statsProjects.filter((p) => p.phases[key]).length,
   }));
 
+  // 経験年数は「業界に居る期間」(暦レンジ) として archived も含める
   const experienceYears =
-    statsProjects.length > 0
-      ? calculateExperienceYears(statsProjects.map((p) => p.period))
+    allProjects.length > 0
+      ? calculateExperienceYears(allProjects.map((p) => p.period))
       : 0;
 
   // engineer 整形
   let engineer: TerminalData["engineer"] = null;
   if (engineerExpanded) {
-    const hasName = "name" in engineerExpanded;
-    const hasBirthDate = "birthDate" in engineerExpanded;
     engineer = {
-      name: hasName ? engineerExpanded.name : undefined,
-      age: hasBirthDate ? calculateAge(engineerExpanded.birthDate) : undefined,
+      name: engineerExpanded.name,
+      age: engineerExpanded.birthDate ? calculateAge(engineerExpanded.birthDate) : undefined,
       gender: engineerExpanded.gender,
       nationality: engineerExpanded.nationality,
       finalEducation: engineerExpanded.finalEducation,
