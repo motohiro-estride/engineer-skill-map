@@ -9,7 +9,7 @@
     "build:local": "BUILD_MODE=local astro build --outDir dist-local",
     "build:excel": "BUILD_MODE=excel tsx scripts/build-excel.ts",
     "verify": "tsx scripts/verify-no-leak.ts",
-    "deploy": "yarn build && gh-pages -d dist",
+    "deploy": "yarn build && gh-pages -d dist --dotfiles --remove '**/*'",
     "preview": "astro preview",
     "astro": "astro"
   },
