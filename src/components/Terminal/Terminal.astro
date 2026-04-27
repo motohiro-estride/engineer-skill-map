@@ -26,6 +26,16 @@ const autoplayJson = JSON.stringify(autoplay);
     <span class="term-prompt-symbol">❯</span>
     <span class="term-input-display" id="term-input-display"></span>
     <span class="term-cursor" id="term-cursor" aria-hidden="true"></span>
+    <input
+      type="text"
+      id="term-input-proxy"
+      class="term-input-proxy"
+      autocapitalize="off"
+      autocorrect="off"
+      autocomplete="off"
+      spellcheck="false"
+      aria-label="terminal input"
+    />
   </div>
 </div>
 
@@ -42,12 +52,14 @@ const autoplayJson = JSON.stringify(autoplay);
   const autoplay = (window as any).__TERMINAL_AUTOPLAY__;
 
   const elements = {
+    root: document.getElementById("term-root")!,
     output: document.getElementById("term-output")!,
     promptLine: document.getElementById("term-prompt-line")!,
     promptCwd: document.getElementById("term-prompt-cwd")!,
     inputDisplay: document.getElementById("term-input-display")!,
     cursor: document.getElementById("term-cursor")!,
     rootScroll: document.getElementById("term-scroll")!,
+    inputProxy: document.getElementById("term-input-proxy") as HTMLInputElement,
   };
 
   if (data && elements.output) {

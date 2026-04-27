@@ -5,12 +5,15 @@ import type { TerminalData } from "./data-source";
 import { runCommand, getCompletions, type CommandLine } from "./commands";
 
 export interface TerminalElements {
+  root: HTMLElement;
   output: HTMLElement;
   promptLine: HTMLElement;
   promptCwd: HTMLElement;
   inputDisplay: HTMLElement;
   cursor: HTMLElement;
   rootScroll: HTMLElement;
+  /** モバイルで IME を呼び出すための不可視 input。デスクトップでも常駐 focus する。 */
+  inputProxy: HTMLInputElement;
 }
 
 interface Options {
@@ -51,7 +54,7 @@ export class TerminalRunner {
   }
 
   async start(): Promise<void> {
-    this.attachKeyListener();
+    this.attachListeners();
     this.hidePrompt();
     this.updatePromptCwd();
     await this.runAutoplay();
@@ -139,48 +142,76 @@ export class TerminalRunner {
   private enableUserInput(): void {
     this.inputEnabled = true;
     this.showPrompt();
+    // デスクトップでは自動 focus でそのまま打てる。モバイルは focus() だけでは IME が出ないが、
+    // ユーザーがタップすれば click ハンドラ経由で focus される。
+    this.el.inputProxy.focus({ preventScroll: true });
   }
 
-  private attachKeyListener(): void {
-    document.addEventListener("keydown", (e) => this.handleKey(e));
+  private syncDisplayFromProxy(): void {
+    this.inputBuffer = this.el.inputProxy.value;
+    this.el.inputDisplay.textContent = this.inputBuffer;
+    this.scrollToBottom();
   }
 
-  private handleKey(e: KeyboardEvent): void {
-    // モード判定: Plain mode のときは無効
+  /** inputBuffer をプログラム的に書き換えた後、表示と proxy を同期する。 */
+  private setInputBuffer(value: string): void {
+    this.inputBuffer = value;
+    this.el.inputProxy.value = value;
+    this.el.inputDisplay.textContent = value;
+  }
+
+  private attachListeners(): void {
+    // 自動再生中の任意キーでのスキップ用 (input にフォーカスが無くても効くように document に置く)
+    document.addEventListener("keydown", () => {
+      if (document.documentElement.dataset.mode === "plain") return;
+      if (this.autoplayActive) this.autoplayCancelled = true;
+    });
+
+    // ターミナル領域タップで input proxy に focus → モバイルで IME を呼び出す。
+    // 自動再生中は同時にスキップ。
+    this.el.root.addEventListener("click", () => {
+      if (document.documentElement.dataset.mode === "plain") return;
+      if (this.autoplayActive) this.autoplayCancelled = true;
+      this.el.inputProxy.focus({ preventScroll: true });
+    });
+
+    // 文字入力 (英数, IME 確定, モバイルキーボードからの入力すべて) は input イベントで拾う。
+    this.el.inputProxy.addEventListener("input", () => {
+      if (document.documentElement.dataset.mode === "plain") return;
+      if (!this.inputEnabled) {
+        // 入力受付前は proxy に流れた文字を捨てる
+        this.el.inputProxy.value = "";
+        return;
+      }
+      this.syncDisplayFromProxy();
+    });
+
+    // Enter / Tab / 矢印キーは keydown で拾う (input イベントには来ないため)
+    this.el.inputProxy.addEventListener("keydown", (e) => this.handleProxyKey(e));
+  }
+
+  private handleProxyKey(e: KeyboardEvent): void {
     if (document.documentElement.dataset.mode === "plain") return;
-
-    // 自動再生中は任意キーでスキップ
     if (this.autoplayActive) {
       this.autoplayCancelled = true;
       return;
     }
-
     if (!this.inputEnabled) return;
 
-    // 入力フォーカス系の要素にフォーカスがあるなら無視
-    const active = document.activeElement;
-    if (active && (active.tagName === "INPUT" || active.tagName === "TEXTAREA")) return;
-
     if (e.key === "Enter") {
-      this.submitInput();
       e.preventDefault();
+      this.submitInput();
     } else if (e.key === "Tab") {
       e.preventDefault();
       this.handleTab();
-    } else if (e.key === "Backspace") {
-      this.inputBuffer = this.inputBuffer.slice(0, -1);
-      this.el.inputDisplay.textContent = this.inputBuffer;
-      e.preventDefault();
     } else if (e.key === "ArrowUp") {
+      e.preventDefault();
       this.recallHistory(-1);
-      e.preventDefault();
     } else if (e.key === "ArrowDown") {
-      this.recallHistory(1);
       e.preventDefault();
-    } else if (e.key.length === 1 && !e.ctrlKey && !e.metaKey && !e.altKey) {
-      this.inputBuffer += e.key;
-      this.el.inputDisplay.textContent = this.inputBuffer;
+      this.recallHistory(1);
     }
+    // 通常キー / Backspace は input 要素本来の挙動に任せ、input イベントで同期する
   }
 
   // --- Tab 補完 ---
@@ -212,8 +243,7 @@ export class TerminalRunner {
 
   private replaceLastToken(lastToken: string, replacement: string): void {
     const buf = this.inputBuffer;
-    this.inputBuffer = buf.slice(0, buf.length - lastToken.length) + replacement;
-    this.el.inputDisplay.textContent = this.inputBuffer;
+    this.setInputBuffer(buf.slice(0, buf.length - lastToken.length) + replacement);
   }
 
   private showCompletionCandidates(candidates: string[]): void {
@@ -239,17 +269,15 @@ export class TerminalRunner {
     if (this.historyIndex < 0) this.historyIndex = 0;
     if (this.historyIndex >= this.history.length) {
       this.historyIndex = -1;
-      this.inputBuffer = "";
+      this.setInputBuffer("");
     } else {
-      this.inputBuffer = this.history[this.historyIndex];
+      this.setInputBuffer(this.history[this.historyIndex]!);
     }
-    this.el.inputDisplay.textContent = this.inputBuffer;
   }
 
   private submitInput(): void {
     const cmd = this.inputBuffer;
-    this.inputBuffer = "";
-    this.el.inputDisplay.textContent = "";
+    this.setInputBuffer("");
     this.historyIndex = -1;
 
     if (!cmd.trim()) {
