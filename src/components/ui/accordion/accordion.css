@@ -1,0 +1,34 @@
+/* shadcn / Radix Accordion 用のスタイル */
+
+/* Radix が data-state="open" / "closed" を Content に付与するので、それに対してアニメーションを当てる */
+[data-slot="accordion-content"] {
+  overflow: hidden;
+}
+
+[data-slot="accordion-content"][data-state="open"] {
+  animation: ui-accordion-open 500ms ease-out;
+}
+
+[data-slot="accordion-content"][data-state="closed"] {
+  animation: ui-accordion-close 500ms ease-out;
+}
+
+@keyframes ui-accordion-open {
+  from {
+    height: 0;
+    opacity: 0;
+  }
+  to {
+    height: var(--radix-accordion-content-height);
+    opacity: 1;
+  }
+}
+
+@keyframes ui-accordion-close {
+  from {
+    height: var(--radix-accordion-content-height);
+  }
+  to {
+    height: 0;
+  }
+}

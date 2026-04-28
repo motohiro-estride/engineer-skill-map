@@ -21,7 +21,10 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import Terminal from "@/components/Terminal/Terminal.astro";
 import { ModeToggle } from "@/components/ModeToggle/ModeToggle";
+import { MemoAccordion } from "@/components/MemoAccordion/MemoAccordion";
+import { renderMarkdown } from "@/libs/markdown/markdown";
 import "../styles/globals.css";
+import "../styles/memo.css";
 
 const mode = getBuildMode();
 
@@ -538,15 +541,7 @@ const age = engineer?.birthDate ? calculateAge(engineer.birthDate) : null;
                     })}
                   </div>
                   {p.memo && (
-                    <div class="mt-2 space-y-0.5 rounded-md border border-amber-300/20 bg-amber-300/10 p-2 text-xs">
-                      <div class="flex items-center gap-1 font-semibold text-amber-100">
-                        📝 メモ
-                        <Badge variant="outline" className="border-amber-300/30 text-[10px] text-amber-100">
-                          selfOnly
-                        </Badge>
-                      </div>
-                      <p class="whitespace-pre-line text-amber-50/80">{p.memo}</p>
-                    </div>
+                    <MemoAccordion client:load html={renderMarkdown(p.memo)} />
                   )}
                 </article>
               );
