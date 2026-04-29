@@ -162,8 +162,12 @@ export class TerminalRunner {
 
   private attachListeners(): void {
     // 自動再生中の任意キーでのスキップ用 (input にフォーカスが無くても効くように document に置く)
-    document.addEventListener("keydown", () => {
+    // ただし inputProxy 上のキー入力は handleProxyKey が個別に処理するため、ここでは除外する。
+    // (除外しないと replay 入力時の Enter が submitInput → runAutoplay 開始後にバブルアップして
+    //  autoplayCancelled を立ててしまい、開始した autoplay が即座に止まる)
+    document.addEventListener("keydown", (e) => {
       if (document.documentElement.dataset.mode === "plain") return;
+      if (e.target === this.el.inputProxy) return;
       if (this.autoplayActive) this.autoplayCancelled = true;
     });
 
@@ -292,7 +296,7 @@ export class TerminalRunner {
 
     this.history.push(cmd);
 
-    // clear / replay は特殊処理
+    // clear / replay / exit は特殊処理
     if (cmd.trim() === "clear") {
       this.el.output.innerHTML = "";
       return;
@@ -305,6 +309,12 @@ export class TerminalRunner {
       this.hidePrompt();
       this.autoplayCancelled = false;
       this.runAutoplay().then(() => this.enableUserInput());
+      return;
+    }
+    if (cmd.trim() === "exit") {
+      // ModeToggle ボタンをプログラム的にクリックして plain に戻す
+      const btn = document.getElementById("mode-toggle") as HTMLButtonElement | null;
+      btn?.click();
       return;
     }
 

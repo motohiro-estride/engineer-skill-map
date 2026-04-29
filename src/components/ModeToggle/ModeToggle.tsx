@@ -50,6 +50,14 @@ export function ModeToggle() {
     } catch {
       // localStorage が使えない環境では諦める
     }
+
+    // world モードに切り替えた直後はターミナル入力へフォーカスを移す。
+    // そのままだとボタンがフォーカスを保持し、Enter 押下で停止トグルが誤発火する。
+    if (next === "world") {
+      requestAnimationFrame(() => {
+        document.getElementById("term-input-proxy")?.focus();
+      });
+    }
   };
 
   const label = mode === "world" ? "■ 停止" : "▶ 世界観";
@@ -58,6 +66,7 @@ export function ModeToggle() {
 
   return (
     <button
+      id="mode-toggle"
       type="button"
       onClick={toggle}
       aria-label={aria}

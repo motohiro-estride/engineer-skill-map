@@ -80,6 +80,7 @@ const helpHandler: CommandHandler = () => ({
     { text: "  stats            aggregated stats", kind: "muted" },
     { text: "  clear            clear screen", kind: "muted" },
     { text: "  replay           replay autoplay", kind: "muted" },
+    { text: "  exit             stop world mode (back to plain)", kind: "muted" },
     { text: "  help             this help", kind: "muted" },
     { text: "" },
   ],
@@ -366,7 +367,7 @@ export const commands: Record<string, CommandHandler> = {
 };
 
 /** runner.ts の submitInput で特殊処理されるコマンド (commands には含まれない) */
-const RUNNER_LEVEL_COMMANDS = ["clear", "replay"] as const;
+const RUNNER_LEVEL_COMMANDS = ["clear", "replay", "exit"] as const;
 
 /** 全コマンド名 (補完候補用) */
 export function allCommandNames(): string[] {
