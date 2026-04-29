@@ -43,6 +43,8 @@ export class TerminalRunner {
   private historyIndex = -1;
   private inputEnabled = false;
   private cwd = "~";
+  /** IME 変換中フラグ。e.isComposing がブラウザ依存で当てにならないケースの保険 */
+  private composing = false;
 
   constructor(opts: Options) {
     this.data = opts.data;
@@ -192,6 +194,19 @@ export class TerminalRunner {
 
     // Enter / Tab / 矢印キーは keydown で拾う (input イベントには来ないため)
     this.el.inputProxy.addEventListener("keydown", (e) => this.handleProxyKey(e));
+
+    // IME 変換中フラグの管理。keydown.isComposing が環境依存で当てにならないため、
+    // composition イベントを直接捕まえて自前フラグでガードする
+    this.el.inputProxy.addEventListener("compositionstart", () => {
+      this.composing = true;
+    });
+    this.el.inputProxy.addEventListener("compositionend", () => {
+      // 同じ Enter キーで keydown が compositionend より後に来る環境の保険として、
+      // 1 フレーム遅らせてから false に戻す
+      requestAnimationFrame(() => {
+        this.composing = false;
+      });
+    });
   }
 
   private handleProxyKey(e: KeyboardEvent): void {
@@ -201,6 +216,11 @@ export class TerminalRunner {
       return;
     }
     if (!this.inputEnabled) return;
+
+    // IME 変換中のキー入力は IME に任せる (Enter で確定、矢印で候補移動 等)
+    // e.isComposing 単独では Chromium / Safari のクセで漏れることがあるため、
+    // 自前 composing フラグも合わせてチェック
+    if (e.isComposing || this.composing) return;
 
     if (e.key === "Enter") {
       e.preventDefault();
